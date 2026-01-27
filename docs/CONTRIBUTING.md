@@ -28,7 +28,7 @@ Thank you for your interest in contributing to Social Platform! We welcome contr
 #### Development Setup
 ```bash
 # Clone your fork
-git clone https://github.com/yourusername/social-platform.git
+git clone https://github.com/Shaishav13/social-platform.git
 cd social-platform
 
 # Install dependencies

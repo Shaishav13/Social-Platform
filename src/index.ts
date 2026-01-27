@@ -1,3 +1,14 @@
+/**
+ * Social Platform - Main Server Entry Point
+ * 
+ * Copyright (c) 2025 Shaishav
+ * Licensed under the MIT License
+ * 
+ * A modern social media platform with microservices architecture
+ * Author: Shaishav <sk.shaishav.9@gmail.com>
+ * GitHub: https://github.com/Shaishav13
+ */
+
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';

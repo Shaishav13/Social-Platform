@@ -15,7 +15,7 @@ Complete guide for deploying Social Platform to production.
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/yourusername/social-platform.git
+git clone https://github.com/Shaishav13/social-platform.git
 cd social-platform
 ```
 
@@ -83,7 +83,7 @@ psql -U social_platform -d social_media_platform -f scripts/init-db.sql
 ### 3. Application Setup
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/social-platform.git
+git clone https://github.com/Shaishav13/social-platform.git
 cd social-platform
 
 # Install dependencies

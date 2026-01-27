@@ -1,3 +1,14 @@
+/**
+ * Social Platform - React Frontend Application
+ * 
+ * Copyright (c) 2025 Shaishav
+ * Licensed under the MIT License
+ * 
+ * Main App component with routing and authentication
+ * Author: Shaishav <sk.shaishav.9@gmail.com>
+ * GitHub: https://github.com/Shaishav13
+ */
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout/Layout';

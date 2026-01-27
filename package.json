@@ -27,7 +27,7 @@
     "react",
     "community"
   ],
-  "author": "",
+  "author": "Shaishav <sk.shaishav.9@gmail.com> (https://github.com/Shaishav13)",
   "license": "MIT",
   "dependencies": {
     "@types/uuid": "^10.0.0",

@@ -14,7 +14,7 @@ Complete guide for setting up Social Platform for local development.
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/yourusername/social-platform.git
+git clone https://github.com/Shaishav13/social-platform.git
 cd social-platform
 ```
 

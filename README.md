@@ -77,7 +77,7 @@ A modern, Instagram-inspired social media platform built with React, TypeScript,
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/social-platform.git
+git clone https://github.com/Shaishav13/social-platform.git
 cd social-platform
 ```
 

@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "UdtaBirdie Socials - A modern social media platform frontend",
+  "author": "Shaishav <sk.shaishav.9@gmail.com> (https://github.com/Shaishav13)",
   "type": "module",
   "scripts": {
     "dev": "vite",
