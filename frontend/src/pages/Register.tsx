@@ -12,9 +12,36 @@ const Register: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
 
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  const calculatePasswordStrength = (password: string): number => {
+    let strength = 0;
+    if (password.length >= 8) strength += 25;
+    if (/[a-z]/.test(password)) strength += 25;
+    if (/[A-Z]/.test(password)) strength += 25;
+    if (/[0-9]/.test(password)) strength += 25;
+    return strength;
+  };
+
+  const getPasswordStrengthText = (strength: number): string => {
+    if (strength === 0) return '';
+    if (strength <= 25) return 'Weak';
+    if (strength <= 50) return 'Fair';
+    if (strength <= 75) return 'Good';
+    return 'Strong';
+  };
+
+  const getPasswordStrengthColor = (strength: number): string => {
+    if (strength <= 25) return '#ff4757';
+    if (strength <= 50) return '#ffa502';
+    if (strength <= 75) return '#3742fa';
+    return '#2ed573';
+  };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -82,6 +109,11 @@ const Register: React.FC = () => {
       ...prev,
       [name]: value
     }));
+
+    // Update password strength
+    if (name === 'password') {
+      setPasswordStrength(calculatePasswordStrength(value));
+    }
     
     // Clear error for this field when user starts typing
     if (errors[name]) {
@@ -93,106 +125,219 @@ const Register: React.FC = () => {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-container">
-        <h1>Join SocialApp</h1>
-        <p className="auth-subtitle">Create your account to get started</p>
-
-        {errors.general && (
-          <div className="error-message">
-            {errors.general}
+    <div className="auth-page-epic">
+      <div className="auth-background">
+        <div className="auth-background-shapes">
+          <div className="shape shape-1"></div>
+          <div className="shape shape-2"></div>
+          <div className="shape shape-3"></div>
+          <div className="shape shape-4"></div>
+        </div>
+      </div>
+      
+      <div className="auth-container-epic register-container">
+        <div className="auth-card register-card">
+          <div className="auth-header">
+            <div className="auth-logo">
+              <div className="logo-icon">🐦</div>
+              <h1 className="logo-text">UdtaBirdie</h1>
+            </div>
+            <h2 className="auth-title">Join the Community</h2>
+            <p className="auth-subtitle">Create your account and start connecting</p>
           </div>
-        )}
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              required
+          {errors.general && (
+            <div className="error-message-epic">
+              <span className="error-icon">⚠️</span>
+              {errors.general}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="auth-form-epic">
+            <div className="form-group-epic">
+              <div className="input-wrapper">
+                <span className="input-icon">👤</span>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                  placeholder="Choose a username"
+                  className={`form-input-epic ${errors.username ? 'error' : ''}`}
+                />
+                <label htmlFor="username" className="floating-label">Username</label>
+              </div>
+              {errors.username && (
+                <span className="field-error-epic">{errors.username}</span>
+              )}
+            </div>
+
+            <div className="form-group-epic">
+              <div className="input-wrapper">
+                <span className="input-icon">📧</span>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                  placeholder="Enter your email"
+                  className={`form-input-epic ${errors.email ? 'error' : ''}`}
+                />
+                <label htmlFor="email" className="floating-label">Email Address</label>
+              </div>
+              {errors.email && (
+                <span className="field-error-epic">{errors.email}</span>
+              )}
+            </div>
+
+            <div className="form-group-epic">
+              <div className="input-wrapper">
+                <span className="input-icon">🔒</span>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                  placeholder="Create a password"
+                  className={`form-input-epic ${errors.password ? 'error' : ''}`}
+                />
+                <label htmlFor="password" className="floating-label">Password</label>
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? '👁️' : '👁️‍🗨️'}
+                </button>
+              </div>
+              {formData.password && (
+                <div className="password-strength">
+                  <div className="strength-bar">
+                    <div 
+                      className="strength-fill" 
+                      style={{ 
+                        width: `${passwordStrength}%`,
+                        backgroundColor: getPasswordStrengthColor(passwordStrength)
+                      }}
+                    ></div>
+                  </div>
+                  <span 
+                    className="strength-text"
+                    style={{ color: getPasswordStrengthColor(passwordStrength) }}
+                  >
+                    {getPasswordStrengthText(passwordStrength)}
+                  </span>
+                </div>
+              )}
+              {errors.password && (
+                <span className="field-error-epic">{errors.password}</span>
+              )}
+            </div>
+
+            <div className="form-group-epic">
+              <div className="input-wrapper">
+                <span className="input-icon">🔐</span>
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                  placeholder="Confirm your password"
+                  className={`form-input-epic ${errors.confirmPassword ? 'error' : ''}`}
+                />
+                <label htmlFor="confirmPassword" className="floating-label">Confirm Password</label>
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                </button>
+              </div>
+              {errors.confirmPassword && (
+                <span className="field-error-epic">{errors.confirmPassword}</span>
+              )}
+            </div>
+
+            <button
+              type="submit"
               disabled={isLoading}
-              placeholder="Choose a username"
-              className={`form-input ${errors.username ? 'error' : ''}`}
-            />
-            {errors.username && (
-              <span className="field-error">{errors.username}</span>
-            )}
+              className="btn-epic btn-primary-epic"
+            >
+              {isLoading ? (
+                <>
+                  <span className="loading-spinner"></span>
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  <span className="btn-icon">🎉</span>
+                  Create Account
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="auth-divider">
+            <span>or</span>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              disabled={isLoading}
-              placeholder="Enter your email"
-              className={`form-input ${errors.email ? 'error' : ''}`}
-            />
-            {errors.email && (
-              <span className="field-error">{errors.email}</span>
-            )}
+          <div className="social-login">
+            <button className="social-btn google-btn" disabled>
+              <span className="social-icon">🔍</span>
+              Sign up with Google
+            </button>
+            <button className="social-btn github-btn" disabled>
+              <span className="social-icon">⚫</span>
+              Sign up with GitHub
+            </button>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              disabled={isLoading}
-              placeholder="Create a password"
-              className={`form-input ${errors.password ? 'error' : ''}`}
-            />
-            {errors.password && (
-              <span className="field-error">{errors.password}</span>
-            )}
+          <div className="auth-footer-epic">
+            <p>
+              Already have an account?{' '}
+              <Link to="/login" className="auth-link-epic">
+                Sign in here
+              </Link>
+            </p>
           </div>
+        </div>
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              required
-              disabled={isLoading}
-              placeholder="Confirm your password"
-              className={`form-input ${errors.confirmPassword ? 'error' : ''}`}
-            />
-            {errors.confirmPassword && (
-              <span className="field-error">{errors.confirmPassword}</span>
-            )}
+        <div className="auth-side-panel">
+          <div className="side-content">
+            <h3>Why Join UdtaBirdie?</h3>
+            <p>Experience the next generation of social networking with our innovative features and vibrant community.</p>
+            <div className="features-list">
+              <div className="feature-item">
+                <span className="feature-icon">🚀</span>
+                <span>Lightning fast</span>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">🎨</span>
+                <span>Beautiful design</span>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">🔐</span>
+                <span>Secure & private</span>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">🌟</span>
+                <span>Amazing features</span>
+              </div>
+            </div>
           </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="btn btn-primary btn-full"
-          >
-            {isLoading ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </form>
-
-        <div className="auth-footer">
-          <p>
-            Already have an account?{' '}
-            <Link to="/login" className="auth-link">
-              Sign in here
-            </Link>
-          </p>
         </div>
       </div>
     </div>
