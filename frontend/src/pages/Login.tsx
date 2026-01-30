@@ -82,10 +82,9 @@ const Login: React.FC = () => {
                   onChange={handleChange}
                   required
                   disabled={isLoading}
-                  placeholder="Enter your email"
                   className="form-input-epic"
                 />
-                <label htmlFor="email" className="floating-label">Email Address</label>
+                <label htmlFor="email" className={`floating-label ${credentials.email ? 'active' : ''}`}>Email Address</label>
               </div>
             </div>
 
@@ -100,10 +99,9 @@ const Login: React.FC = () => {
                   onChange={handleChange}
                   required
                   disabled={isLoading}
-                  placeholder="Enter your password"
                   className="form-input-epic"
                 />
-                <label htmlFor="password" className="floating-label">Password</label>
+                <label htmlFor="password" className={`floating-label ${credentials.password ? 'active' : ''}`}>Password</label>
                 <button
                   type="button"
                   className="password-toggle"

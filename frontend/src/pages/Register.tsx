@@ -165,10 +165,9 @@ const Register: React.FC = () => {
                   onChange={handleChange}
                   required
                   disabled={isLoading}
-                  placeholder="Choose a username"
                   className={`form-input-epic ${errors.username ? 'error' : ''}`}
                 />
-                <label htmlFor="username" className="floating-label">Username</label>
+                <label htmlFor="username" className={`floating-label ${formData.username ? 'active' : ''}`}>Username</label>
               </div>
               {errors.username && (
                 <span className="field-error-epic">{errors.username}</span>
@@ -186,10 +185,9 @@ const Register: React.FC = () => {
                   onChange={handleChange}
                   required
                   disabled={isLoading}
-                  placeholder="Enter your email"
                   className={`form-input-epic ${errors.email ? 'error' : ''}`}
                 />
-                <label htmlFor="email" className="floating-label">Email Address</label>
+                <label htmlFor="email" className={`floating-label ${formData.email ? 'active' : ''}`}>Email Address</label>
               </div>
               {errors.email && (
                 <span className="field-error-epic">{errors.email}</span>
@@ -207,10 +205,9 @@ const Register: React.FC = () => {
                   onChange={handleChange}
                   required
                   disabled={isLoading}
-                  placeholder="Create a password"
                   className={`form-input-epic ${errors.password ? 'error' : ''}`}
                 />
-                <label htmlFor="password" className="floating-label">Password</label>
+                <label htmlFor="password" className={`floating-label ${formData.password ? 'active' : ''}`}>Password</label>
                 <button
                   type="button"
                   className="password-toggle"
@@ -254,10 +251,9 @@ const Register: React.FC = () => {
                   onChange={handleChange}
                   required
                   disabled={isLoading}
-                  placeholder="Confirm your password"
                   className={`form-input-epic ${errors.confirmPassword ? 'error' : ''}`}
                 />
-                <label htmlFor="confirmPassword" className="floating-label">Confirm Password</label>
+                <label htmlFor="confirmPassword" className={`floating-label ${formData.confirmPassword ? 'active' : ''}`}>Confirm Password</label>
                 <button
                   type="button"
                   className="password-toggle"

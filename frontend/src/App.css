@@ -3849,7 +3849,7 @@ body {
 }
 
 .form-input-epic:focus + .floating-label,
-.form-input-epic:not(:placeholder-shown) + .floating-label {
+.floating-label.active {
   transform: translateY(-28px) scale(0.85);
   color: #667eea;
   background: white;
@@ -4248,7 +4248,7 @@ body {
   }
   
   .form-input-epic:focus + .floating-label,
-  .form-input-epic:not(:placeholder-shown) + .floating-label {
+  .floating-label.active {
     background: rgba(44, 62, 80, 0.95);
   }
 }
