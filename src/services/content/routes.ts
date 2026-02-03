@@ -133,7 +133,7 @@ router.post('/posts', authenticateToken, async (req: Request, res: Response): Pr
 
     // Handle mentions in post content
     try {
-      await NotificationEventHandlers.handleMentionEvent(content, userId!, post.id, 'post');
+      await NotificationEventHandlers.handleMentionEvent(content, userId!, post.id, post.id, 'post');
     } catch (notificationError) {
       console.log('Notification error (non-critical):', notificationError);
     }
@@ -200,8 +200,49 @@ router.get('/posts', optionalAuth, async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Check if viewer is the author (to include private posts)
-    const includePrivate = viewerId === authorId;
+    // Check if viewer can see posts from this author
+    let includePrivate = false;
+    
+    if (viewerId === authorId) {
+      // User viewing their own posts - include all posts
+      includePrivate = true;
+    } else if (viewerId) {
+      // Check if the author has a private account
+      const { AuthDatabase } = await import('../auth/database');
+      const author = await AuthDatabase.findUserById(authorId as string);
+      
+      if (author && author.isPrivate) {
+        // Private account - check if viewer is following
+        const { SocialDatabase } = await import('../social/database');
+        const isFollowing = await SocialDatabase.isFollowing(viewerId, authorId as string);
+        
+        if (!isFollowing) {
+          // Not following private account - return 403
+          res.status(403).json({
+            error: 'Private account',
+            message: 'This account is private. Follow to see their posts.'
+          });
+          return;
+        }
+      }
+      // For public accounts or if following private account, include public posts only
+      includePrivate = false;
+    } else {
+      // Not authenticated - check if author has private account
+      const { AuthDatabase } = await import('../auth/database');
+      const author = await AuthDatabase.findUserById(authorId as string);
+      
+      if (author && author.isPrivate) {
+        // Private account and not authenticated - return 403
+        res.status(403).json({
+          error: 'Private account',
+          message: 'This account is private. You must be logged in and following to see their posts.'
+        });
+        return;
+      }
+      // Public account - include public posts only
+      includePrivate = false;
+    }
 
     const posts = await PostModel.getPostsByAuthor(
       authorId as string,
@@ -341,7 +382,7 @@ router.put('/posts/:id', authenticateToken, async (req: Request, res: Response):
     // Handle mentions in updated content
     if (content !== undefined) {
       try {
-        await NotificationEventHandlers.handleMentionEvent(content, userId!, id, 'post');
+        await NotificationEventHandlers.handleMentionEvent(content, userId!, id, id, 'post');
       } catch (notificationError) {
         console.log('Notification error (non-critical):', notificationError);
       }

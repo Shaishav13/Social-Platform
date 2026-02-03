@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { User, Post } from '../types';
@@ -16,14 +16,26 @@ const Profile: React.FC = () => {
   const [isPostsLoading, setIsPostsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isRequested, setIsRequested] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [postCount, setPostCount] = useState(0);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'posts' | 'blogs'>('posts');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    username: '',
+    bio: '',
+    isPrivate: false
+  });
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const isOwnProfile = currentUser?.id === id;
 
@@ -33,6 +45,36 @@ const Profile: React.FC = () => {
       loadUserPosts();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (profileUser) {
+      setEditFormData({
+        username: profileUser.username || '',
+        bio: profileUser.bio || '',
+        isPrivate: profileUser.isPrivate || false
+      });
+      // Reset profile picture states when profile changes
+      setProfilePictureFile(null);
+      setProfilePicturePreview(null);
+    }
+  }, [profileUser]);
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+
+    if (showProfileMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu]);
 
   const loadProfile = async () => {
     try {
@@ -51,6 +93,7 @@ const Profile: React.FC = () => {
         updatedAt: userData.updatedAt || userData.createdAt
       });
       setIsFollowing(userData.isFollowing || false);
+      setIsRequested(userData.isRequested || false);
       setFollowerCount(userData.followerCount || 0);
       setFollowingCount(userData.followingCount || 0);
       setPostCount(userData.postCount || 0);
@@ -70,6 +113,10 @@ const Profile: React.FC = () => {
       setPosts(response.data.posts || []);
     } catch (err: any) {
       console.error('Failed to load user posts:', err);
+      // If it's a 403 error, the profile might be private
+      if (err.response?.status === 403) {
+        setPosts([]);
+      }
     } finally {
       setIsPostsLoading(false);
     }
@@ -79,24 +126,125 @@ const Profile: React.FC = () => {
     if (!id || isFollowLoading) return;
 
     setIsFollowLoading(true);
-    const newIsFollowing = !isFollowing;
-    const newFollowerCount = newIsFollowing ? followerCount + 1 : followerCount - 1;
-
-    // Optimistic update
-    setIsFollowing(newIsFollowing);
-    setFollowerCount(newFollowerCount);
 
     try {
-      // Use POST for both follow and unfollow since the backend toggles the status
-      await api.post(`/social/users/${id}/follow`);
+      if (isFollowing) {
+        // Unfollow
+        await api.delete(`/social/users/${id}/follow`);
+        setIsFollowing(false);
+        setIsRequested(false);
+        setFollowerCount(prev => Math.max(0, prev - 1));
+      } else if (isRequested) {
+        // Cancel follow request
+        await api.delete(`/social/users/${id}/follow-request`);
+        setIsRequested(false);
+      } else {
+        // Send follow request or follow directly
+        const response = await api.post(`/social/users/${id}/follow`);
+        const result = response.data.data;
+        
+        setIsFollowing(result.following || false);
+        setIsRequested(result.requested || false);
+        setFollowerCount(result.followerCount || followerCount);
+        
+        // Reload posts if follow status changed (for private accounts)
+        if (result.following) {
+          loadUserPosts();
+        }
+      }
     } catch (error) {
-      // Revert optimistic update on error
-      setIsFollowing(isFollowing);
-      setFollowerCount(followerCount);
       console.error('Failed to toggle follow:', error);
     } finally {
       setIsFollowLoading(false);
     }
+  };
+
+  const handleEditProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isUpdating) return;
+
+    setIsUpdating(true);
+    try {
+      // First upload profile picture if a new one is selected
+      let profilePictureUrl = profileUser?.profilePicture;
+      
+      if (profilePictureFile) {
+        setIsUploadingPicture(true);
+        const formData = new FormData();
+        formData.append('avatar', profilePictureFile);
+
+        const uploadResponse = await api.post('/profile/avatar', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        if (uploadResponse.data.url) {
+          profilePictureUrl = uploadResponse.data.url;
+        }
+        setIsUploadingPicture(false);
+      }
+
+      // Then update profile information
+      const response = await api.put('/profile', {
+        username: editFormData.username.trim(),
+        bio: editFormData.bio.trim(),
+        isPrivate: editFormData.isPrivate,
+        ...(profilePictureUrl && { profilePicture: profilePictureUrl })
+      });
+
+      if (response.data.success) {
+        setProfileUser(prev => prev ? {
+          ...prev,
+          username: editFormData.username.trim(),
+          bio: editFormData.bio.trim(),
+          isPrivate: editFormData.isPrivate,
+          profilePicture: profilePictureUrl
+        } : null);
+        setShowEditModal(false);
+        setProfilePictureFile(null);
+        setProfilePicturePreview(null);
+        // Reload posts if privacy setting changed
+        loadUserPosts();
+      }
+    } catch (error: any) {
+      console.error('Failed to update profile:', error);
+      alert(error.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setIsUpdating(false);
+      setIsUploadingPicture(false);
+    }
+  };
+
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+
+      setProfilePictureFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfilePicturePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeProfilePicture = () => {
+    setProfilePictureFile(null);
+    setProfilePicturePreview(null);
   };
 
   const handlePostUpdate = (updatedPost: Post) => {
@@ -109,7 +257,7 @@ const Profile: React.FC = () => {
 
   const handlePostDelete = (deletedPostId: string) => {
     setPosts(prev => prev.filter(post => post.id !== deletedPostId));
-    setPostCount(prev => Math.max(0, prev - 1)); // Decrement post count, but don't go below 0
+    setPostCount(prev => Math.max(0, prev - 1));
   };
 
   const handleDeleteAccount = async () => {
@@ -121,7 +269,6 @@ const Profile: React.FC = () => {
         data: { password: deletePassword }
       });
       
-      // Account deleted successfully
       alert('Your account has been permanently deleted.');
       logout();
       navigate('/');
@@ -141,11 +288,26 @@ const Profile: React.FC = () => {
     setDeletePassword('');
   };
 
+  const getJoinDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long' 
+    });
+  };
+
+  const canViewPosts = () => {
+    if (isOwnProfile) return true;
+    if (!profileUser?.isPrivate) return true;
+    return isFollowing;
+  };
+
   if (isLoading) {
     return (
       <div className="profile-page">
         <div className="profile-loading">
-          <div className="loading-spinner">Loading profile...</div>
+          <div className="loading-spinner"></div>
+          <p>Loading profile...</p>
         </div>
       </div>
     );
@@ -155,6 +317,7 @@ const Profile: React.FC = () => {
     return (
       <div className="profile-page">
         <div className="profile-error">
+          <div className="error-icon">😔</div>
           <h2>Profile not found</h2>
           <p>{error || 'The user you are looking for does not exist.'}</p>
           <Link to="/feed" className="btn btn-primary">
@@ -167,59 +330,58 @@ const Profile: React.FC = () => {
 
   return (
     <div className="profile-page">
+      {/* Profile Cover */}
+      <div className="profile-cover">
+        <div className="cover-gradient"></div>
+      </div>
+
       <div className="profile-container">
         {/* Profile Header */}
         <div className="profile-header">
-          <div className="profile-info">
-            <div className="profile-avatar-section">
-              {profileUser.profilePicture ? (
-                <img 
-                  src={profileUser.profilePicture} 
-                  alt={profileUser.username}
-                  className="profile-avatar-large"
-                />
-              ) : (
-                <div className="profile-avatar-large-placeholder">
-                  {profileUser.username.charAt(0).toUpperCase()}
+          <div className="profile-main-section">
+            <div className="profile-left">
+              <div className="profile-avatar-section">
+                <div className="avatar-container">
+                  {profileUser.profilePicture ? (
+                    <img 
+                      src={profileUser.profilePicture} 
+                      alt={profileUser.username}
+                      className="profile-avatar-medium"
+                    />
+                  ) : (
+                    <div className="profile-avatar-medium-placeholder">
+                      {profileUser.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  {profileUser.isPrivate && (
+                    <div className="privacy-badge" title="Private Account">
+                      🔒
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
-            <div className="profile-details">
+            <div className="profile-center">
               <div className="profile-name-section">
                 <h1 className="profile-username">{profileUser.username}</h1>
-                {!isOwnProfile && (
-                  <button
-                    onClick={handleFollowToggle}
-                    disabled={isFollowLoading}
-                    className={`btn ${isFollowing ? 'btn-secondary' : 'btn-primary'} follow-btn`}
-                  >
-                    {isFollowLoading ? '...' : isFollowing ? 'Unfollow' : 'Follow'}
-                  </button>
-                )}
-                {isOwnProfile && (
-                  <div className="profile-actions">
-                    <Link to="/profile/edit" className="btn btn-secondary">
-                      Edit Profile
-                    </Link>
-                    <button
-                      onClick={() => {
-                        logout();
-                        navigate('/');
-                      }}
-                      className="btn btn-outline logout-btn"
-                    >
-                      Logout
-                    </button>
-                    <button
-                      onClick={() => setShowDeleteModal(true)}
-                      className="btn btn-danger"
-                    >
-                      Delete Account
-                    </button>
-                  </div>
-                )}
+                <div className="profile-meta">
+                  <span className="join-date">
+                    Joined {getJoinDate(profileUser.createdAt)}
+                  </span>
+                  {profileUser.isPrivate && (
+                    <span className="privacy-indicator">
+                      Private Account
+                    </span>
+                  )}
+                </div>
               </div>
+
+              {profileUser.bio && (
+                <div className="profile-bio">
+                  <p>{profileUser.bio}</p>
+                </div>
+              )}
 
               <div className="profile-stats">
                 <div className="stat-item">
@@ -236,38 +398,122 @@ const Profile: React.FC = () => {
                 </div>
               </div>
 
-              {profileUser.bio && (
-                <div className="profile-bio">
-                  <p>{profileUser.bio}</p>
+              {!isOwnProfile && (
+                <div className="profile-follow-action">
+                  <button
+                    onClick={handleFollowToggle}
+                    disabled={isFollowLoading}
+                    className={`btn ${
+                      isFollowing 
+                        ? 'btn-following' 
+                        : isRequested 
+                          ? 'btn-requested' 
+                          : 'btn-follow'
+                    }`}
+                  >
+                    {isFollowLoading ? (
+                      <span className="loading-dots">...</span>
+                    ) : isFollowing ? (
+                      <>
+                        <span className="follow-icon">✓</span>
+                        Following
+                      </>
+                    ) : isRequested ? (
+                      <>
+                        <span className="follow-icon">⏳</span>
+                        Requested
+                      </>
+                    ) : (
+                      <>
+                        <span className="follow-icon">+</span>
+                        Follow
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Profile Tabs */}
-        <div className="profile-tabs">
-          <button
-            className={`tab-btn ${activeTab === 'posts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('posts')}
-          >
-            📱 Posts
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'blogs' ? 'active' : ''}`}
-            onClick={() => setActiveTab('blogs')}
-          >
-            📝 Blogs
-          </button>
+            {isOwnProfile && (
+              <div className="profile-right">
+                <div className="profile-menu" ref={profileMenuRef}>
+                  <button
+                    className="profile-menu-btn"
+                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  >
+                    ⋯
+                  </button>
+                  {showProfileMenu && (
+                    <div className="profile-menu-dropdown">
+                      <button
+                        className="menu-item"
+                        onClick={() => {
+                          setShowEditModal(true);
+                          setShowProfileMenu(false);
+                        }}
+                      >
+                        <span className="menu-icon">✏️</span>
+                        Edit Profile
+                      </button>
+                      <button
+                        className="menu-item"
+                        onClick={() => {
+                          logout();
+                          navigate('/');
+                        }}
+                      >
+                        <span className="menu-icon">🚪</span>
+                        Logout
+                      </button>
+                      <button
+                        className="menu-item delete-btn"
+                        onClick={() => {
+                          setShowDeleteModal(true);
+                          setShowProfileMenu(false);
+                        }}
+                      >
+                        <span className="menu-icon">🗑️</span>
+                        Delete Account
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Profile Content */}
         <div className="profile-content">
-          {activeTab === 'posts' && (
-            <div className="profile-posts">
+          {/* Privacy Message for Private Accounts */}
+          {profileUser.isPrivate && !canViewPosts() && (
+            <div className="private-account-message">
+              <div className="private-icon">🔒</div>
+              <h3>This account is private</h3>
+              <p>Follow {profileUser.username} to see their posts and activity.</p>
+            </div>
+          )}
+
+          {/* Posts Section */}
+          {canViewPosts() && (
+            <div className="profile-posts-section">
+              <div className="section-header">
+                <h2>
+                  <span className="section-icon">📱</span>
+                  Posts
+                </h2>
+                {isOwnProfile && (
+                  <Link to="/create-post" className="btn btn-create-post">
+                    <span className="btn-icon">+</span>
+                    Create Post
+                  </Link>
+                )}
+              </div>
+
               {isPostsLoading ? (
                 <div className="posts-loading">
-                  <div className="loading-spinner">Loading posts...</div>
+                  <div className="loading-spinner"></div>
+                  <p>Loading posts...</p>
                 </div>
               ) : posts.length > 0 ? (
                 <div className="posts-grid">
@@ -287,12 +533,13 @@ const Profile: React.FC = () => {
                   <h3>No posts yet</h3>
                   <p>
                     {isOwnProfile 
-                      ? "You haven't shared any posts yet. Create your first post!"
+                      ? "You haven't shared any posts yet. Create your first post to get started!"
                       : `${profileUser.username} hasn't shared any posts yet.`
                     }
                   </p>
                   {isOwnProfile && (
                     <Link to="/create-post" className="btn btn-primary">
+                      <span className="btn-icon">✨</span>
                       Create Your First Post
                     </Link>
                   )}
@@ -300,25 +547,184 @@ const Profile: React.FC = () => {
               )}
             </div>
           )}
-
-          {activeTab === 'blogs' && (
-            <div className="profile-blogs">
-              <div className="empty-blogs">
-                <div className="empty-icon">📝</div>
-                <h3>No blogs yet</h3>
-                <p>Blog functionality will be implemented in a future update.</p>
-              </div>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal-content edit-profile-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <span className="modal-icon">✏️</span>
+                Edit Profile
+              </h2>
+              <button 
+                className="modal-close-btn"
+                onClick={() => setShowEditModal(false)}
+                disabled={isUpdating}
+              >
+                ×
+              </button>
+            </div>
+            
+            <form onSubmit={handleEditProfile} className="modal-body">
+              <div className="form-group profile-picture-section">
+                <label>Profile Picture</label>
+                <div className="profile-picture-upload">
+                  <div className="current-picture">
+                    {profilePicturePreview ? (
+                      <img 
+                        src={profilePicturePreview} 
+                        alt="Profile preview"
+                        className="profile-picture-preview"
+                      />
+                    ) : profileUser?.profilePicture ? (
+                      <img 
+                        src={profileUser.profilePicture} 
+                        alt="Current profile"
+                        className="profile-picture-preview"
+                      />
+                    ) : (
+                      <div className="profile-picture-placeholder">
+                        {profileUser?.username.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="picture-upload-controls">
+                    <input
+                      type="file"
+                      id="profile-picture-input"
+                      accept="image/*"
+                      onChange={handleProfilePictureChange}
+                      className="picture-input"
+                      disabled={isUpdating}
+                    />
+                    <label 
+                      htmlFor="profile-picture-input" 
+                      className="btn btn-secondary picture-upload-btn"
+                    >
+                      <span className="btn-icon">📷</span>
+                      Choose Photo
+                    </label>
+                    {(profilePicturePreview || profilePictureFile) && (
+                      <button
+                        type="button"
+                        onClick={removeProfilePicture}
+                        className="btn btn-ghost remove-picture-btn"
+                        disabled={isUpdating}
+                      >
+                        <span className="btn-icon">🗑️</span>
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <small className="upload-hint">
+                    JPG, PNG, GIF up to 5MB. Recommended: 400x400px
+                  </small>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-username">Username</label>
+                <input
+                  id="edit-username"
+                  type="text"
+                  value={editFormData.username}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, username: e.target.value }))}
+                  placeholder="Enter your username"
+                  maxLength={50}
+                  required
+                  disabled={isUpdating}
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-bio">Bio</label>
+                <textarea
+                  id="edit-bio"
+                  value={editFormData.bio}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, bio: e.target.value }))}
+                  placeholder="Tell us about yourself..."
+                  maxLength={500}
+                  rows={4}
+                  disabled={isUpdating}
+                />
+                <small className="char-count">{editFormData.bio.length}/500</small>
+              </div>
+
+              <div className="form-group privacy-setting">
+                <div className="privacy-toggle">
+                  <input
+                    id="edit-private"
+                    type="checkbox"
+                    checked={editFormData.isPrivate}
+                    onChange={(e) => setEditFormData(prev => ({ ...prev, isPrivate: e.target.checked }))}
+                    disabled={isUpdating}
+                  />
+                  <label htmlFor="edit-private" className="toggle-label">
+                    <span className="toggle-switch"></span>
+                    <div className="toggle-content">
+                      <span className="toggle-title">
+                        {editFormData.isPrivate ? '🔒 Private Account' : '🌍 Public Account'}
+                      </span>
+                      <span className="toggle-description">
+                        {editFormData.isPrivate 
+                          ? 'Only your followers can see your posts'
+                          : 'Anyone can see your posts'
+                        }
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </form>
+            
+            <div className="modal-footer">
+              <button
+                type="button"
+                onClick={() => setShowEditModal(false)}
+                className="btn btn-secondary"
+                disabled={isUpdating}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditProfile}
+                className="btn btn-primary"
+                disabled={isUpdating || isUploadingPicture}
+              >
+                {isUploadingPicture ? (
+                  <>
+                    <span className="loading-spinner small"></span>
+                    Uploading Photo...
+                  </>
+                ) : isUpdating ? (
+                  <>
+                    <span className="loading-spinner small"></span>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <span className="btn-icon">💾</span>
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Account Confirmation Modal */}
       {showDeleteModal && (
         <div className="modal-overlay" onClick={handleCancelDelete}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Delete Account</h2>
+              <h2>
+                <span className="modal-icon">⚠️</span>
+                Delete Account
+              </h2>
               <button 
                 className="modal-close-btn"
                 onClick={handleCancelDelete}
@@ -330,18 +736,17 @@ const Profile: React.FC = () => {
             
             <div className="modal-body">
               <div className="delete-warning">
-                <div className="warning-icon">⚠️</div>
-                <h3>This action cannot be undone!</h3>
-                <p>
-                  Deleting your account will permanently remove:
-                </p>
-                <ul>
-                  <li>Your profile and all personal information</li>
-                  <li>All your posts, comments, and media</li>
-                  <li>Your likes, shares, and social interactions</li>
-                  <li>Your followers and following relationships</li>
-                  <li>All your notifications and activity history</li>
-                </ul>
+                <div className="warning-content">
+                  <h3>This action cannot be undone!</h3>
+                  <p>Deleting your account will permanently remove:</p>
+                  <ul>
+                    <li>Your profile and all personal information</li>
+                    <li>All your posts, comments, and media</li>
+                    <li>Your likes, shares, and social interactions</li>
+                    <li>Your followers and following relationships</li>
+                    <li>All your notifications and activity history</li>
+                  </ul>
+                </div>
               </div>
               
               <div className="password-confirmation">
@@ -373,7 +778,17 @@ const Profile: React.FC = () => {
                 className="btn btn-danger"
                 disabled={!deletePassword.trim() || isDeleting}
               >
-                {isDeleting ? 'Deleting...' : 'Delete My Account'}
+                {isDeleting ? (
+                  <>
+                    <span className="loading-spinner small"></span>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <span className="btn-icon">🗑️</span>
+                    Delete My Account
+                  </>
+                )}
               </button>
             </div>
           </div>

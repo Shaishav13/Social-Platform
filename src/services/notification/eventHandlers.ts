@@ -24,6 +24,7 @@ export class NotificationEventHandlers {
       type: 'like',
       actorId,
       targetId: postId,
+      postId: postId,
       message,
     };
 
@@ -56,6 +57,7 @@ export class NotificationEventHandlers {
       type: 'comment',
       actorId,
       targetId: commentId, // Use comment ID as target
+      postId: postId, // Include post ID for navigation
       message,
     };
 
@@ -67,7 +69,7 @@ export class NotificationEventHandlers {
   }
 
   /**
-   * Handle follow events - create notification for followed user
+   * Handle follow events - create notification for followed user (for public accounts)
    */
   static async handleFollowEvent(followedUserId: string, followerUserId: string): Promise<void> {
     const follower = await AuthDatabase.findUserById(followerUserId);
@@ -82,6 +84,54 @@ export class NotificationEventHandlers {
       type: 'follow',
       actorId: followerUserId,
       targetId: followedUserId, // Target is the followed user
+      message,
+    };
+
+    try {
+      await NotificationModel.createNotification(notificationData);
+    } catch (error) {
+      console.log(`Notification not sent: ${error}`);
+    }
+  }
+  static async handleFollowRequestEvent(targetUserId: string, requesterUserId: string): Promise<void> {
+    const requester = await AuthDatabase.findUserById(requesterUserId);
+    if (!requester) {
+      return;
+    }
+
+    const message = NotificationModel.generateNotificationMessage('follow_request', requester.username);
+
+    const notificationData: NotificationCreateRequest = {
+      userId: targetUserId,
+      type: 'follow_request',
+      actorId: requesterUserId,
+      targetId: targetUserId, // Target is the user who received the request
+      message,
+    };
+
+    try {
+      await NotificationModel.createNotification(notificationData);
+    } catch (error) {
+      console.log(`Notification not sent: ${error}`);
+    }
+  }
+
+  /**
+   * Handle follow request accepted events - create notification for requester
+   */
+  static async handleFollowAcceptedEvent(requesterUserId: string, targetUserId: string): Promise<void> {
+    const targetUser = await AuthDatabase.findUserById(targetUserId);
+    if (!targetUser) {
+      return;
+    }
+
+    const message = NotificationModel.generateNotificationMessage('follow_accepted', targetUser.username);
+
+    const notificationData: NotificationCreateRequest = {
+      userId: requesterUserId,
+      type: 'follow_accepted',
+      actorId: targetUserId,
+      targetId: requesterUserId, // Target is the requester who gets notified
       message,
     };
 
@@ -113,6 +163,7 @@ export class NotificationEventHandlers {
       type: 'share',
       actorId,
       targetId: postId,
+      postId: postId,
       message,
     };
 
@@ -126,7 +177,7 @@ export class NotificationEventHandlers {
   /**
    * Handle mention events - create notifications for mentioned users
    */
-  static async handleMentionEvent(content: string, actorId: string, targetId: string, targetType: 'post' | 'comment' = 'post'): Promise<void> {
+  static async handleMentionEvent(content: string, actorId: string, targetId: string, postId: string, targetType: 'post' | 'comment' = 'post'): Promise<void> {
     const mentions = NotificationModel.detectMentions(content);
     if (mentions.length === 0) {
       return;
@@ -150,6 +201,7 @@ export class NotificationEventHandlers {
           type: 'mention',
           actorId,
           targetId,
+          postId: postId,
           message,
         });
       }

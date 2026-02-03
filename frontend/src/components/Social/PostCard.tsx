@@ -10,11 +10,22 @@ import { resolveMediaUrl, handleMediaError, getMediaAltText } from '../../utils/
 interface PostCardProps {
   post: Post;
   currentUser?: User;
+  isDetailView?: boolean;
+  onUpdate?: (updatedPost: Post) => void;
+  onDelete?: (postId: string) => void;
   onPostUpdate?: (updatedPost: Post) => void;
   onPostDelete?: (postId: string) => void;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onPostUpdate, onPostDelete }) => {
+const PostCard: React.FC<PostCardProps> = ({ 
+  post, 
+  currentUser, 
+  isDetailView = false,
+  onUpdate,
+  onDelete,
+  onPostUpdate, 
+  onPostDelete 
+}) => {
   const [showComments, setShowComments] = useState(false);
   const [localPost, setLocalPost] = useState(post);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -43,8 +54,10 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onPostUpdate, on
 
   const handlePostUpdate = (updatedPost: Post) => {
     setLocalPost(updatedPost);
-    if (onPostUpdate) {
-      onPostUpdate(updatedPost);
+    // Use the new unified callback names
+    const updateCallback = onUpdate || onPostUpdate;
+    if (updateCallback) {
+      updateCallback(updatedPost);
     }
   };
 
@@ -62,8 +75,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onPostUpdate, on
       setIsEditing(false);
       setShowMenu(false);
       
-      if (onPostUpdate) {
-        onPostUpdate(updatedPost);
+      if (onUpdate || onPostUpdate) {
+        const updateCallback = onUpdate || onPostUpdate;
+        updateCallback(updatedPost);
       }
     } catch (error) {
       console.error('Failed to update post:', error);
@@ -94,8 +108,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onPostUpdate, on
       await api.delete(`/content/posts/${localPost.id}`);
       
       // Notify parent component about deletion
-      if (onPostDelete) {
-        onPostDelete(localPost.id);
+      const deleteCallback = onDelete || onPostDelete;
+      if (deleteCallback) {
+        deleteCallback(localPost.id);
       }
     } catch (error) {
       console.error('Failed to delete post:', error);

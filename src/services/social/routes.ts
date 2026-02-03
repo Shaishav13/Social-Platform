@@ -10,7 +10,7 @@ const router = express.Router();
 router.post('/posts/:id/like', authenticateToken, async (req, res) => {
   try {
     const postId = req.params.id;
-    const userId = req.user!.userId;
+    const userId = (req as any).user.userId;
 
     // Validate request
     const validation = LikeModel.validateLikeRequest(postId, 'post');
@@ -51,7 +51,7 @@ router.post('/posts/:id/like', authenticateToken, async (req, res) => {
 router.delete('/posts/:id/like', authenticateToken, async (req, res) => {
   try {
     const postId = req.params.id;
-    const userId = req.user!.userId;
+    const userId = (req as any).user.userId;
 
     // Validate request
     const validation = LikeModel.validateLikeRequest(postId, 'post');
@@ -89,7 +89,7 @@ router.delete('/posts/:id/like', authenticateToken, async (req, res) => {
 router.get('/posts/:id/like', authenticateToken, async (req, res) => {
   try {
     const postId = req.params.id;
-    const userId = req.user!.userId;
+    const userId = (req as any).user.userId;
 
     const result = await LikeModel.getLikeStatus(userId, postId, 'post');
     
@@ -110,7 +110,7 @@ router.get('/posts/:id/like', authenticateToken, async (req, res) => {
 router.post('/comments/:id/like', authenticateToken, async (req, res) => {
   try {
     const commentId = req.params.id;
-    const userId = req.user!.userId;
+    const userId = (req as any).user.userId;
 
     // Validate request
     const validation = LikeModel.validateLikeRequest(commentId, 'comment');
@@ -140,7 +140,7 @@ router.post('/comments/:id/like', authenticateToken, async (req, res) => {
 router.post('/posts/:id/comments', authenticateToken, async (req, res) => {
   try {
     const postId = req.params.id;
-    const userId = req.user!.userId;
+    const userId = (req as any).user.userId;
     const { content, parentId } = req.body;
 
     // Validate request
@@ -162,7 +162,7 @@ router.post('/posts/:id/comments', authenticateToken, async (req, res) => {
       }
       
       // Handle mentions in comment content
-      await NotificationEventHandlers.handleMentionEvent(content, userId, comment.id, 'comment');
+      await NotificationEventHandlers.handleMentionEvent(content, userId, comment.id, postId, 'comment');
     } catch (notificationError) {
       console.log('Notification error (non-critical):', notificationError);
     }
@@ -204,7 +204,7 @@ router.get('/posts/:id/comments', async (req, res) => {
 router.post('/posts/:id/share', authenticateToken, async (req, res) => {
   try {
     const postId = req.params.id;
-    const userId = req.user!.userId;
+    const userId = (req as any).user.userId;
 
     // Validate request
     const validation = ShareModel.validateShareRequest(postId);
@@ -246,7 +246,7 @@ router.post('/posts/:id/share', authenticateToken, async (req, res) => {
 router.get('/posts/:id/share', authenticateToken, async (req, res) => {
   try {
     const postId = req.params.id;
-    const userId = req.user!.userId;
+    const userId = (req as any).user.userId;
 
     const result = await ShareModel.getShareStatus(userId, postId);
     
@@ -266,11 +266,11 @@ router.get('/posts/:id/share', authenticateToken, async (req, res) => {
 // Follow/Unfollow endpoints
 router.post('/users/:id/follow', authenticateToken, async (req, res) => {
   try {
-    const followingId = req.params.id;
-    const followerId = req.user!.userId;
+    const targetId = req.params.id;
+    const requesterId = (req as any).user.userId;
 
     // Validate request
-    const validation = FollowModel.validateFollowRequest(followerId, followingId);
+    const validation = FollowModel.validateFollowRequest(requesterId, targetId);
     if (!validation.isValid) {
       return res.status(400).json({
         error: 'Validation failed',
@@ -278,12 +278,20 @@ router.post('/users/:id/follow', authenticateToken, async (req, res) => {
       });
     }
 
-    const result = await FollowModel.toggleFollow(followerId, followingId);
+    const result = await FollowModel.sendFollowRequest(requesterId, targetId);
     
-    // Send notification if follow was added (not removed)
+    // Send appropriate notification
     if (result.following) {
+      // Direct follow (public account) - send follow notification
       try {
-        await NotificationEventHandlers.handleFollowEvent(followingId, followerId);
+        await NotificationEventHandlers.handleFollowEvent(targetId, requesterId);
+      } catch (notificationError) {
+        console.log('Notification error (non-critical):', notificationError);
+      }
+    } else if (result.requested) {
+      // Follow request sent (private account) - send follow request notification
+      try {
+        await NotificationEventHandlers.handleFollowRequestEvent(targetId, requesterId);
       } catch (notificationError) {
         console.log('Notification error (non-critical):', notificationError);
       }
@@ -294,7 +302,116 @@ router.post('/users/:id/follow', authenticateToken, async (req, res) => {
       data: result
     });
   } catch (error) {
-    console.error('Error toggling follow:', error);
+    console.error('Error sending follow request:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Unfollow endpoint
+router.delete('/users/:id/follow', authenticateToken, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const requesterId = (req as any).user.userId;
+
+    const result = await FollowModel.unfollow(requesterId, targetId);
+    
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error unfollowing user:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Cancel follow request endpoint
+router.delete('/users/:id/follow-request', authenticateToken, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const requesterId = (req as any).user.userId;
+
+    const result = await FollowModel.cancelFollowRequest(requesterId, targetId);
+    
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error cancelling follow request:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Accept follow request endpoint
+router.post('/follow-requests/:id/accept', authenticateToken, async (req, res) => {
+  try {
+    const requestId = req.params.id;
+    const targetId = (req as any).user.userId;
+
+    const result = await FollowModel.acceptFollowRequest(requestId, targetId);
+    
+    if (result.success) {
+      // Send notification to requester that their request was accepted
+      try {
+        // Get the request details to find the requester
+        const requests = await FollowModel.getPendingFollowRequests(targetId);
+        const acceptedRequest = requests.find(r => r.id === requestId);
+        if (acceptedRequest) {
+          await NotificationEventHandlers.handleFollowAcceptedEvent(acceptedRequest.requesterId, targetId);
+        }
+      } catch (notificationError) {
+        console.log('Notification error (non-critical):', notificationError);
+      }
+    }
+    
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error accepting follow request:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Decline follow request endpoint
+router.post('/follow-requests/:id/decline', authenticateToken, async (req, res) => {
+  try {
+    const requestId = req.params.id;
+    const targetId = (req as any).user.userId;
+
+    const result = await FollowModel.declineFollowRequest(requestId, targetId);
+    
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error declining follow request:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get pending follow requests
+router.get('/follow-requests', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+
+    const requests = await FollowModel.getPendingFollowRequests(userId);
+    
+    res.status(200).json({
+      success: true,
+      data: requests
+    });
+  } catch (error) {
+    console.error('Error getting follow requests:', error);
     res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'Unknown error'
@@ -305,10 +422,10 @@ router.post('/users/:id/follow', authenticateToken, async (req, res) => {
 // Get follow status
 router.get('/users/:id/follow', authenticateToken, async (req, res) => {
   try {
-    const followingId = req.params.id;
-    const followerId = req.user!.userId;
+    const targetId = req.params.id;
+    const requesterId = (req as any).user.userId;
 
-    const result = await FollowModel.getFollowStatus(followerId, followingId);
+    const result = await FollowModel.getFollowStatus(requesterId, targetId);
     
     res.status(200).json({
       success: true,

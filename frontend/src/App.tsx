@@ -21,7 +21,10 @@ import Feed from './pages/Feed';
 import Profile from './pages/Profile';
 import EditProfile from './pages/EditProfile';
 import CreatePostPage from './pages/CreatePost';
+import PostDetail from './pages/PostDetail';
 import Notifications from './pages/Notifications';
+import FollowRequests from './pages/FollowRequests';
+import TestFollowRequests from './pages/TestFollowRequests';
 import Search from './pages/Search';
 import Explore from './pages/Explore';
 import './App.css';
@@ -66,9 +69,29 @@ function App() {
                 <CreatePostPage />
               </ProtectedRoute>
             } />
+            <Route path="/post/:postId" element={
+              <ProtectedRoute>
+                <PostDetail />
+              </ProtectedRoute>
+            } />
+            <Route path="/post/:postId/comment/:commentId" element={
+              <ProtectedRoute>
+                <PostDetail />
+              </ProtectedRoute>
+            } />
             <Route path="/notifications" element={
               <ProtectedRoute>
                 <Notifications />
+              </ProtectedRoute>
+            } />
+            <Route path="/follow-requests" element={
+              <ProtectedRoute>
+                <FollowRequests />
+              </ProtectedRoute>
+            } />
+            <Route path="/test-follow-requests" element={
+              <ProtectedRoute>
+                <TestFollowRequests />
               </ProtectedRoute>
             } />
             <Route path="/search" element={

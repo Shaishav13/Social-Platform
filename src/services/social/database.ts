@@ -1,5 +1,5 @@
 import { DatabaseConnection } from '../../config/database';
-import { Like, Comment, Share, CommentWithReplies, Follow } from './types';
+import { Like, Comment, Share, CommentWithReplies, Follow, FollowRequest } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 export class SocialDatabase {
@@ -57,6 +57,20 @@ export class SocialDatabase {
         )
       `);
 
+      // Create follow_requests table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS follow_requests (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          target_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(requester_id, target_id),
+          CHECK (requester_id != target_id)
+        )
+      `);
+
       // Create indexes for better performance
       await client.query('CREATE INDEX IF NOT EXISTS idx_likes_target ON likes(target_id, target_type)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_likes_user ON likes(user_id)');
@@ -66,6 +80,9 @@ export class SocialDatabase {
       await client.query('CREATE INDEX IF NOT EXISTS idx_shares_user ON shares(user_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_follows_following ON follows(following_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_follow_requests_requester ON follow_requests(requester_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_follow_requests_target ON follow_requests(target_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_follow_requests_status ON follow_requests(status)');
 
     } finally {
       client.release();
@@ -606,6 +623,136 @@ export class SocialDatabase {
   static async deleteUserFollows(userId: string): Promise<void> {
     await DatabaseConnection.query(
       'DELETE FROM follows WHERE follower_id = $1 OR following_id = $1',
+      [userId]
+    );
+  }
+
+  // Follow Request operations
+  static async createFollowRequest(requesterId: string, targetId: string): Promise<FollowRequest> {
+    const client = await DatabaseConnection.getClient();
+    
+    try {
+      const result = await client.query(
+        `INSERT INTO follow_requests (requester_id, target_id, status) 
+         VALUES ($1, $2, 'pending') 
+         RETURNING id, requester_id, target_id, status, created_at, updated_at`,
+        [requesterId, targetId]
+      );
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        requesterId: row.requester_id,
+        targetId: row.target_id,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  static async findFollowRequest(requesterId: string, targetId: string): Promise<FollowRequest | null> {
+    const client = await DatabaseConnection.getClient();
+    
+    try {
+      const result = await client.query(
+        'SELECT id, requester_id, target_id, status, created_at, updated_at FROM follow_requests WHERE requester_id = $1 AND target_id = $2',
+        [requesterId, targetId]
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        requesterId: row.requester_id,
+        targetId: row.target_id,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  static async updateFollowRequestStatus(requestId: string, status: 'accepted' | 'declined'): Promise<FollowRequest | null> {
+    const client = await DatabaseConnection.getClient();
+    
+    try {
+      const result = await client.query(
+        `UPDATE follow_requests 
+         SET status = $1, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $2 
+         RETURNING id, requester_id, target_id, status, created_at, updated_at`,
+        [status, requestId]
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        requesterId: row.requester_id,
+        targetId: row.target_id,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  static async deleteFollowRequest(requesterId: string, targetId: string): Promise<boolean> {
+    const client = await DatabaseConnection.getClient();
+    
+    try {
+      const result = await client.query(
+        'DELETE FROM follow_requests WHERE requester_id = $1 AND target_id = $2',
+        [requesterId, targetId]
+      );
+
+      return (result.rowCount ?? 0) > 0;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async getPendingFollowRequests(userId: string): Promise<FollowRequest[]> {
+    const client = await DatabaseConnection.getClient();
+    
+    try {
+      const result = await client.query(
+        `SELECT id, requester_id, target_id, status, created_at, updated_at
+         FROM follow_requests 
+         WHERE target_id = $1 AND status = 'pending'
+         ORDER BY created_at DESC`,
+        [userId]
+      );
+
+      return result.rows.map(row => ({
+        id: row.id,
+        requesterId: row.requester_id,
+        targetId: row.target_id,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+    } finally {
+      client.release();
+    }
+  }
+
+  static async deleteUserFollowRequests(userId: string): Promise<void> {
+    await DatabaseConnection.query(
+      'DELETE FROM follow_requests WHERE requester_id = $1 OR target_id = $1',
       [userId]
     );
   }

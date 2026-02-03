@@ -431,7 +431,9 @@ export class ContentDatabase {
       const result = await client.query(`
         SELECT p.*
         FROM posts p
+        JOIN users u ON p.author_id = u.id
         WHERE p.is_public = true
+          AND u.is_private = false
           AND p.created_at > NOW() - INTERVAL '7 days'
         ORDER BY (p.like_count + p.comment_count + p.share_count) DESC, p.created_at DESC
         LIMIT $1
@@ -507,11 +509,16 @@ export class ContentDatabase {
     followingOnly?: boolean;
   }): Promise<PostWithMedia[]> {
     // Use getFeedWithLikes to include author information
-    return await this.getFeedWithLikes({
+    const feedOptions: { limit: number; offset: number; userId?: string } = {
       limit: options.limit,
-      offset: options.offset,
-      userId: options.userId
-    });
+      offset: options.offset
+    };
+    
+    if (options.userId) {
+      feedOptions.userId = options.userId;
+    }
+    
+    return await this.getFeedWithLikes(feedOptions);
   }
 
   static async getFeedWithLikes(options: { limit: number; offset: number; userId?: string }): Promise<PostWithMedia[]> {
@@ -551,6 +558,28 @@ export class ContentDatabase {
       
       query += `
         WHERE p.is_public = true
+      `;
+      
+      // Filter out posts from private accounts unless user is following them
+      if (options.userId) {
+        query += `
+          AND (
+            u.is_private = false 
+            OR u.id = $${paramCount++}
+            OR EXISTS (
+              SELECT 1 FROM follows f 
+              WHERE f.follower_id = $${paramCount++} 
+              AND f.following_id = u.id
+            )
+          )
+        `;
+        params.push(options.userId, options.userId);
+      } else {
+        // Not authenticated - only show posts from public accounts
+        query += ` AND u.is_private = false`;
+      }
+      
+      query += `
         ORDER BY p.created_at DESC
         LIMIT $${paramCount++} OFFSET $${paramCount++}
       `;

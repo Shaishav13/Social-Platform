@@ -1,10 +1,46 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import SearchBar from '../Search/SearchBar';
+import { useState, useEffect } from 'react';
+import api from '../../services/api';
+
+// Extend Window interface for global function
+declare global {
+  interface Window {
+    updateHeaderUnreadCount?: (count: number) => void;
+  }
+}
 
 const Header: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadUnreadCount();
+      // Poll for unread count every 30 seconds
+      const interval = setInterval(loadUnreadCount, 30000);
+      
+      // Set up global function for other components to update count
+      window.updateHeaderUnreadCount = (count: number) => {
+        setUnreadCount(count);
+      };
+      
+      return () => {
+        clearInterval(interval);
+        delete window.updateHeaderUnreadCount;
+      };
+    }
+  }, [isAuthenticated]);
+
+  const loadUnreadCount = async () => {
+    try {
+      const response = await api.get('/notifications/unread-count');
+      setUnreadCount(response.data.unreadCount || 0);
+    } catch (error) {
+      console.error('Failed to load unread count:', error);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -31,7 +67,12 @@ const Header: React.FC = () => {
                 Create
               </Link>
               <Link to="/blogs" className="nav-link">Blogs</Link>
-              <Link to="/notifications" className="nav-link">Notifications</Link>
+              <Link to="/notifications" className="nav-link notifications-link">
+                Notifications
+                {unreadCount > 0 && (
+                  <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                )}
+              </Link>
               
               <div className="user-menu">
                 <Link to={`/profile/${user?.id}`} className="profile-link">

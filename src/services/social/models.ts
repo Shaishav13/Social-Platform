@@ -1,5 +1,6 @@
-import { Like, Comment, Share, CommentWithReplies, CreateCommentRequest, LikeResponse, ShareResponse } from './types';
+import { Like, Comment, Share, CommentWithReplies, CreateCommentRequest, LikeResponse, ShareResponse, FollowResponse, FollowRequest } from './types';
 import { SocialDatabase } from './database';
+import { ProfileModel } from '../profile/models';
 
 export class LikeModel {
   static async toggleLike(userId: string, targetId: string, targetType: 'post' | 'comment'): Promise<LikeResponse> {
@@ -199,43 +200,132 @@ export class ShareModel {
 }
 
 export class FollowModel {
-  static async toggleFollow(followerId: string, followingId: string): Promise<{ following: boolean }> {
+  static async sendFollowRequest(requesterId: string, targetId: string): Promise<FollowResponse> {
     // Prevent self-following
-    if (followerId === followingId) {
+    if (requesterId === targetId) {
       throw new Error('Users cannot follow themselves');
     }
 
     // Check if already following
-    const existingFollow = await SocialDatabase.findFollow(followerId, followingId);
-    
+    const existingFollow = await SocialDatabase.findFollow(requesterId, targetId);
     if (existingFollow) {
-      // Unfollow
-      await SocialDatabase.deleteFollow(followerId, followingId);
-      return { following: false };
-    } else {
-      // Follow
-      await SocialDatabase.createFollow(followerId, followingId);
-      return { following: true };
+      const followerCount = await SocialDatabase.getFollowerCount(targetId);
+      return { following: true, followerCount };
     }
+
+    // Check if there's already a pending request
+    const existingRequest = await SocialDatabase.findFollowRequest(requesterId, targetId);
+    if (existingRequest && existingRequest.status === 'pending') {
+      const followerCount = await SocialDatabase.getFollowerCount(targetId);
+      return { following: false, requested: true, followerCount };
+    }
+
+    // Get target user's privacy settings
+    const targetUser = await ProfileModel.getPrivateProfile(targetId, targetId);
+    if (!targetUser) {
+      throw new Error('Target user not found');
+    }
+
+    const followerCount = await SocialDatabase.getFollowerCount(targetId);
+
+    // If target user has public account, follow immediately
+    if (!targetUser.isPrivate) {
+      await SocialDatabase.createFollow(requesterId, targetId);
+      return { following: true, followerCount: followerCount + 1 };
+    }
+
+    // If target user has private account, send follow request
+    await SocialDatabase.createFollowRequest(requesterId, targetId);
+    return { following: false, requested: true, followerCount };
   }
 
-  static async getFollowStatus(followerId: string, followingId: string): Promise<{ following: boolean }> {
-    const existingFollow = await SocialDatabase.findFollow(followerId, followingId);
-    return { following: !!existingFollow };
+  static async acceptFollowRequest(requestId: string, targetId: string): Promise<{ success: boolean; message: string }> {
+    // Update request status to accepted
+    const updatedRequest = await SocialDatabase.updateFollowRequestStatus(requestId, 'accepted');
+    if (!updatedRequest) {
+      return { success: false, message: 'Follow request not found' };
+    }
+
+    // Verify the request belongs to the target user
+    if (updatedRequest.targetId !== targetId) {
+      return { success: false, message: 'Unauthorized to accept this request' };
+    }
+
+    // Create the follow relationship
+    await SocialDatabase.createFollow(updatedRequest.requesterId, updatedRequest.targetId);
+
+    return { success: true, message: 'Follow request accepted' };
   }
 
-  static validateFollowRequest(followerId: string, followingId: string): { isValid: boolean; errors: string[] } {
+  static async declineFollowRequest(requestId: string, targetId: string): Promise<{ success: boolean; message: string }> {
+    // Update request status to declined
+    const updatedRequest = await SocialDatabase.updateFollowRequestStatus(requestId, 'declined');
+    if (!updatedRequest) {
+      return { success: false, message: 'Follow request not found' };
+    }
+
+    // Verify the request belongs to the target user
+    if (updatedRequest.targetId !== targetId) {
+      return { success: false, message: 'Unauthorized to decline this request' };
+    }
+
+    return { success: true, message: 'Follow request declined' };
+  }
+
+  static async cancelFollowRequest(requesterId: string, targetId: string): Promise<{ success: boolean; message: string }> {
+    const deleted = await SocialDatabase.deleteFollowRequest(requesterId, targetId);
+    if (!deleted) {
+      return { success: false, message: 'Follow request not found' };
+    }
+
+    return { success: true, message: 'Follow request cancelled' };
+  }
+
+  static async unfollow(followerId: string, followingId: string): Promise<FollowResponse> {
+    const deleted = await SocialDatabase.deleteFollow(followerId, followingId);
+    const followerCount = await SocialDatabase.getFollowerCount(followingId);
+    
+    return { 
+      following: false, 
+      followerCount: deleted ? followerCount : followerCount 
+    };
+  }
+
+  static async getFollowStatus(requesterId: string, targetId: string): Promise<FollowResponse> {
+    // Check if already following
+    const existingFollow = await SocialDatabase.findFollow(requesterId, targetId);
+    if (existingFollow) {
+      const followerCount = await SocialDatabase.getFollowerCount(targetId);
+      return { following: true, followerCount };
+    }
+
+    // Check if there's a pending request
+    const existingRequest = await SocialDatabase.findFollowRequest(requesterId, targetId);
+    const followerCount = await SocialDatabase.getFollowerCount(targetId);
+    
+    if (existingRequest && existingRequest.status === 'pending') {
+      return { following: false, requested: true, followerCount };
+    }
+
+    return { following: false, followerCount };
+  }
+
+  static async getPendingFollowRequests(userId: string): Promise<FollowRequest[]> {
+    return SocialDatabase.getPendingFollowRequests(userId);
+  }
+
+  static validateFollowRequest(requesterId: string, targetId: string): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
-    if (!followerId || followerId.trim().length === 0) {
-      errors.push('Follower ID is required');
+    if (!requesterId || requesterId.trim().length === 0) {
+      errors.push('Requester ID is required');
     }
 
-    if (!followingId || followingId.trim().length === 0) {
-      errors.push('Following ID is required');
+    if (!targetId || targetId.trim().length === 0) {
+      errors.push('Target ID is required');
     }
 
-    if (followerId === followingId) {
+    if (requesterId === targetId) {
       errors.push('Users cannot follow themselves');
     }
 

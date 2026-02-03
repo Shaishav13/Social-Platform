@@ -86,13 +86,26 @@ export interface Blog {
 export interface Notification {
   id: string;
   userId: string;
-  type: 'like' | 'comment' | 'follow' | 'share' | 'mention';
+  type: 'like' | 'comment' | 'follow' | 'follow_request' | 'follow_accepted' | 'share' | 'mention';
   actorId: string;
   actor?: User;
   targetId: string;
+  postId?: string;
+  metadata?: string;
   message: string;
   isRead: boolean;
   createdAt: string;
+}
+
+// Follow Request types
+export interface FollowRequest {
+  id: string;
+  requesterId: string;
+  requester?: User;
+  targetId: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
+  updatedAt: string;
 }
 
 // API Response types

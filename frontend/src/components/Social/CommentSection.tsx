@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { Comment, User } from '../../types';
 import api from '../../services/api';
@@ -6,12 +6,14 @@ import api from '../../services/api';
 interface CommentSectionProps {
   postId: string;
   currentUser?: User;
+  highlightCommentId?: string | null;
   onCommentCountChange?: (newCount: number) => void;
 }
 
 const CommentSection: React.FC<CommentSectionProps> = ({ 
   postId, 
   currentUser,
+  highlightCommentId,
   onCommentCountChange 
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -20,10 +22,23 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
+  const highlightedCommentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadComments();
   }, [postId]);
+
+  useEffect(() => {
+    // Scroll to highlighted comment after comments are loaded
+    if (highlightCommentId && comments.length > 0 && highlightedCommentRef.current) {
+      setTimeout(() => {
+        highlightedCommentRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 100);
+    }
+  }, [highlightCommentId, comments]);
 
   const loadComments = async () => {
     setIsLoading(true);
@@ -115,8 +130,14 @@ const CommentSection: React.FC<CommentSectionProps> = ({
     return `${diffInDays}d`;
   };
 
-  const CommentItem: React.FC<{ comment: Comment; isReply?: boolean }> = ({ comment, isReply = false }) => (
-    <div className={`comment-item ${isReply ? 'reply' : ''}`}>
+  const CommentItem: React.FC<{ comment: Comment; isReply?: boolean }> = ({ comment, isReply = false }) => {
+    const isHighlighted = highlightCommentId === comment.id;
+    
+    return (
+      <div 
+        className={`comment-item ${isReply ? 'reply' : ''} ${isHighlighted ? 'highlighted' : ''}`}
+        ref={isHighlighted ? highlightedCommentRef : null}
+      >
       <Link to={`/profile/${comment.authorId}`} className="comment-author-link">
         {comment.author?.profilePicture ? (
           <img 
@@ -227,7 +248,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <div className="comment-section">

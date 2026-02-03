@@ -10,6 +10,8 @@ export class NotificationDatabase {
         type VARCHAR(20) NOT NULL CHECK (type IN ('like', 'comment', 'follow', 'share', 'mention')),
         actor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         target_id UUID NOT NULL,
+        post_id UUID,
+        metadata TEXT,
         message TEXT NOT NULL,
         is_read BOOLEAN DEFAULT false,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -36,6 +38,7 @@ export class NotificationDatabase {
       CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
       CREATE INDEX IF NOT EXISTS idx_notifications_actor_id ON notifications(actor_id);
       CREATE INDEX IF NOT EXISTS idx_notifications_target_id ON notifications(target_id);
+      CREATE INDEX IF NOT EXISTS idx_notifications_post_id ON notifications(post_id);
       CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
       CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
       CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
@@ -58,14 +61,16 @@ export class NotificationDatabase {
 
   static async createNotification(notificationData: NotificationCreateRequest): Promise<Notification> {
     const result = await DatabaseConnection.query(
-      `INSERT INTO notifications (user_id, type, actor_id, target_id, message)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO notifications (user_id, type, actor_id, target_id, post_id, metadata, message)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         notificationData.userId,
         notificationData.type,
         notificationData.actorId,
         notificationData.targetId,
+        notificationData.postId || null,
+        notificationData.metadata || null,
         notificationData.message,
       ]
     ) as any;
@@ -77,6 +82,8 @@ export class NotificationDatabase {
       type: row.type,
       actorId: row.actor_id,
       targetId: row.target_id,
+      postId: row.post_id,
+      metadata: row.metadata,
       message: row.message,
       isRead: row.is_read,
       createdAt: row.created_at,
@@ -93,19 +100,21 @@ export class NotificationDatabase {
     let paramIndex = 1;
 
     notifications.forEach((notification) => {
-      values.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4})`);
+      values.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`);
       params.push(
         notification.userId,
         notification.type,
         notification.actorId,
         notification.targetId,
+        notification.postId || null,
+        notification.metadata || null,
         notification.message
       );
-      paramIndex += 5;
+      paramIndex += 7;
     });
 
     const result = await DatabaseConnection.query(
-      `INSERT INTO notifications (user_id, type, actor_id, target_id, message)
+      `INSERT INTO notifications (user_id, type, actor_id, target_id, post_id, metadata, message)
        VALUES ${values.join(', ')}
        RETURNING *`,
       params
@@ -117,6 +126,8 @@ export class NotificationDatabase {
       type: row.type,
       actorId: row.actor_id,
       targetId: row.target_id,
+      postId: row.post_id,
+      metadata: row.metadata,
       message: row.message,
       isRead: row.is_read,
       createdAt: row.created_at,
@@ -125,9 +136,13 @@ export class NotificationDatabase {
 
   static async getUserNotifications(userId: string, limit: number = 50, offset: number = 0): Promise<Notification[]> {
     const result = await DatabaseConnection.query(
-      `SELECT * FROM notifications 
-       WHERE user_id = $1 
-       ORDER BY created_at DESC 
+      `SELECT n.*, 
+              u.username as actor_username,
+              u.profile_picture as actor_profile_picture
+       FROM notifications n
+       LEFT JOIN users u ON n.actor_id = u.id
+       WHERE n.user_id = $1 
+       ORDER BY n.created_at DESC 
        LIMIT $2 OFFSET $3`,
       [userId, limit, offset]
     ) as any;
@@ -138,9 +153,16 @@ export class NotificationDatabase {
       type: row.type,
       actorId: row.actor_id,
       targetId: row.target_id,
+      postId: row.post_id,
+      metadata: row.metadata,
       message: row.message,
       isRead: row.is_read,
       createdAt: row.created_at,
+      actor: row.actor_username ? {
+        id: row.actor_id,
+        username: row.actor_username,
+        profilePicture: row.actor_profile_picture
+      } : undefined
     }));
   }
 
@@ -316,27 +338,6 @@ export class NotificationDatabase {
       'DELETE FROM notifications WHERE created_at < CURRENT_TIMESTAMP - INTERVAL $1 DAY',
       [daysOld]
     );
-  }
-
-  // Data export methods
-  static async getUserNotifications(userId: string): Promise<Notification[]> {
-    const result = await DatabaseConnection.query(
-      `SELECT * FROM notifications 
-       WHERE user_id = $1 
-       ORDER BY created_at DESC`,
-      [userId]
-    ) as any;
-
-    return result.rows.map((row: any) => ({
-      id: row.id,
-      userId: row.user_id,
-      type: row.type,
-      actorId: row.actor_id,
-      targetId: row.target_id,
-      message: row.message,
-      isRead: row.is_read,
-      createdAt: row.created_at,
-    }));
   }
 
   // Data deletion methods

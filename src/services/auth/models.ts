@@ -317,11 +317,12 @@ export class DataExportModel {
       // 1. Delete notifications (references user)
       await NotificationDatabase.deleteUserNotifications(userId);
 
-      // 2. Delete social interactions (likes, comments, shares, follows)
+      // 2. Delete social interactions (likes, comments, shares, follows, follow requests)
       await SocialDatabase.deleteUserLikes(userId);
       await SocialDatabase.deleteUserComments(userId);
       await SocialDatabase.deleteUserShares(userId);
       await SocialDatabase.deleteUserFollows(userId);
+      await SocialDatabase.deleteUserFollowRequests(userId);
 
       // 3. Delete blogs
       await BlogDatabase.deleteUserBlogs(userId);

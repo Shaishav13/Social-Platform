@@ -31,6 +31,15 @@ export interface Follow {
   createdAt: Date;
 }
 
+export interface FollowRequest {
+  id: string;
+  requesterId: string; // User who sent the request
+  targetId: string; // User who received the request
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Request/Response types
 export interface CreateCommentRequest {
   content: string;
@@ -54,4 +63,10 @@ export interface LikeResponse {
 export interface ShareResponse {
   shared: boolean;
   shareCount: number;
+}
+
+export interface FollowResponse {
+  following: boolean;
+  requested?: boolean; // For follow requests
+  followerCount: number;
 }

@@ -104,6 +104,8 @@ export class NotificationModel {
       case 'comment':
         return preferences.enableComments;
       case 'follow':
+      case 'follow_request':
+      case 'follow_accepted':
         return preferences.enableFollows;
       case 'share':
         return preferences.enableShares;
@@ -172,6 +174,10 @@ export class NotificationModel {
         return `${actorUsername} commented on your ${targetType || 'post'}`;
       case 'follow':
         return `${actorUsername} started following you`;
+      case 'follow_request':
+        return `${actorUsername} wants to follow you`;
+      case 'follow_accepted':
+        return `${actorUsername} accepted your follow request`;
       case 'share':
         return `${actorUsername} shared your ${targetType || 'post'}`;
       case 'mention':

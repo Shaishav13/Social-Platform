@@ -71,6 +71,28 @@ const upload = multer({
   },
 });
 
+// Get current user's profile
+router.get('/me', authenticateToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const privateProfile = await ProfileModel.getPrivateProfile(userId, userId);
+    if (!privateProfile) {
+      res.status(404).json({ error: 'Profile not found' });
+      return;
+    }
+
+    res.json({ success: true, data: privateProfile });
+  } catch (error) {
+    console.error('Error fetching current user profile:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get user profile (public or private based on permissions)
 router.get('/:id', optionalAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -124,6 +146,15 @@ router.put('/', authenticateToken, async (req: Request, res: Response): Promise<
       return;
     }
 
+    // Handle isPrivate field - support both direct and nested format
+    if ('isPrivate' in updateData && updateData.isPrivate !== undefined) {
+      if (!updateData.settings) {
+        updateData.settings = {};
+      }
+      updateData.settings.isPrivate = updateData.isPrivate as boolean;
+      delete (updateData as any).isPrivate; // Remove direct field
+    }
+
     const updatedUser = await ProfileModel.updateProfile(userId, updateData);
     if (!updatedUser) {
       res.status(404).json({ error: 'User not found' });
@@ -132,7 +163,7 @@ router.put('/', authenticateToken, async (req: Request, res: Response): Promise<
 
     // Return updated private profile
     const updatedProfile = await ProfileModel.getPrivateProfile(userId, userId);
-    res.json(updatedProfile);
+    res.json({ success: true, data: updatedProfile });
   } catch (error) {
     console.error('Error updating profile:', error);
     if (error instanceof Error) {
