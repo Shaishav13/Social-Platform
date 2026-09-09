@@ -75,7 +75,7 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
       setIsSubmitting(true);
       setError('');
 
-      let mediaUrls: string[] = [];
+      let mediaIds: string[] = [];
 
       // If files attached, upload all together
       if (selectedFiles.length > 0) {
@@ -89,18 +89,22 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
           headers: { 'Content-Type': 'multipart/form-data' },
         });
 
-        if (Array.isArray(uploadRes.data?.urls) && uploadRes.data.urls.length > 0) {
-          mediaUrls = uploadRes.data.urls;
-        } else if (Array.isArray(uploadRes.data?.media) && uploadRes.data.media.length > 0) {
-          mediaUrls = uploadRes.data.media.map((m: any) => m.url || m);
-        } else if (uploadRes.data?.url) {
-          mediaUrls = [uploadRes.data.url];
+        // Extract media IDs from upload response — the backend create-post endpoint
+        // requires mediaIds (DB record IDs), not URL strings
+        const uploads: any[] = uploadRes.data?.uploads || uploadRes.data?.media || [];
+        if (uploads.length > 0) {
+          mediaIds = uploads.map((u: any) => u.id).filter(Boolean);
+        }
+
+        // Fallback: if no IDs (unexpected response shape), warn in console
+        if (mediaIds.length === 0) {
+          console.warn('[Upload] No media IDs returned from upload endpoint:', uploadRes.data);
         }
       }
 
       await api.post('/content/posts', {
         content: content.trim(),
-        mediaUrls,
+        mediaIds,
       });
 
       setContent('');
