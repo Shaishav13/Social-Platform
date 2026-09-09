@@ -55,6 +55,9 @@ dotenv.config();
 const config = validateEnvironment();
 
 const app = express();
+// Trust Render's (and Vercel's) reverse proxy so express-rate-limit can read
+// the real client IP from the X-Forwarded-For header without throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+app.set('trust proxy', 1);
 const PORT = config.get('server.port');
 
 // CRITICAL: Handle uploads FIRST, before ANY other middleware

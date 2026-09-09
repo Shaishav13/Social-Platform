@@ -19,6 +19,8 @@ export class APIGateway {
 
   constructor() {
     this.app = express();
+    // Trust Render's reverse proxy so rate-limiting reads the real client IP
+    this.app.set('trust proxy', 1);
     this.setupMiddleware();
   }
 
