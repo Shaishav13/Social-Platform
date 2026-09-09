@@ -186,7 +186,9 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
       await AuthDatabase.createOrUpdateEmailVerification(existingUser.id, existingUser.email, otpHash, expiresAt);
-      await EmailService.sendVerificationOtp(existingUser.email, registerData.username, otp);
+      EmailService.sendVerificationOtp(existingUser.email, registerData.username, otp).catch(err => {
+        console.error('[EMAIL] Async unverified update email error:', err);
+      });
 
       return res.status(200).json({
         success: true,

@@ -72,6 +72,42 @@ export class EmailService {
   }
 
   /**
+   * Try sending email via Resend HTTP API (port 443 — never blocked by Render/cloud firewalls).
+   * Resend free tier: only allows sending TO the account owner email unless a custom domain is verified.
+   * With 'onboarding@resend.dev' as sender, any recipient works in test mode up to 100 emails/day.
+   */
+  private static async sendViaResend(to: string, subject: string, html: string, text: string): Promise<boolean> {
+    const apiKey = (process.env.RESEND_API_KEY || process.env.RESEND_KEY || '').replace(/["'\s]/g, '');
+    if (!apiKey) return false;
+
+    // Use onboarding@resend.dev as from-address — this is Resend's universal test sender
+    // that can send to ANY email without domain verification
+    const from = (process.env.RESEND_FROM || 'UdtaBirdie <onboarding@resend.dev>').replace(/["']/g, '');
+
+    try {
+      console.log(`[EMAIL-RESEND] Attempting Resend API dispatch to ${to}...`);
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ from, to: [to], subject, html, text }),
+      });
+      const data: any = await res.json().catch(() => ({}));
+      if (res.ok && data.id) {
+        console.log(`[EMAIL-RESEND] ✅ Delivered! Message ID: ${data.id}`);
+        return true;
+      }
+      console.error(`[EMAIL-RESEND] ❌ Error ${res.status}:`, data.message || JSON.stringify(data));
+      return false;
+    } catch (err: any) {
+      console.error('[EMAIL-RESEND] ❌ Request failed:', err.message);
+      return false;
+    }
+  }
+
+  /**
    * Send 6-digit email verification OTP to new account via SMTP
    */
   static async sendVerificationOtp(email: string, username: string, otp: string): Promise<boolean> {
@@ -229,6 +265,16 @@ Security Notice: Never share this code with anyone. UdtaBirdie staff will never 
 If you did not sign up for UdtaBirdie, please ignore this email.
 `;
 
+    // 1. Try Resend HTTP API first (bypasses Render/cloud SMTP port blocks)
+    const resendOk = await this.sendViaResend(
+      email,
+      `${otp} is your UdtaBirdie verification code`,
+      htmlContent,
+      textContent,
+    );
+    if (resendOk) return true;
+
+    // 2. Fall back to SMTP
     if (transporter) {
       try {
         const info = await transporter.sendMail({
@@ -288,6 +334,16 @@ ${resetUrl}
 This link is valid for 1 hour. If you did not request this, please ignore this email.
 `;
 
+    // 1. Try Resend HTTP API first
+    const resendOk = await this.sendViaResend(
+      email,
+      'Reset your UdtaBirdie password',
+      htmlContent,
+      textContent,
+    );
+    if (resendOk) return true;
+
+    // 2. Fall back to SMTP
     if (transporter) {
       try {
         const info = await transporter.sendMail({
