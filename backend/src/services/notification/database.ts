@@ -16,6 +16,9 @@ export class NotificationDatabase {
         is_read BOOLEAN DEFAULT false,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS post_id UUID;
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata TEXT;
     `;
 
     const createNotificationPreferencesTable = `

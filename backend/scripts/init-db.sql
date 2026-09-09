@@ -142,6 +142,8 @@ CREATE TABLE IF NOT EXISTS notifications (
     type VARCHAR(50) NOT NULL CHECK (type IN ('like', 'comment', 'follow', 'share', 'mention')),
     actor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     target_id UUID NOT NULL,
+    post_id UUID,
+    metadata TEXT,
     message TEXT NOT NULL,
     is_read BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -153,9 +155,9 @@ CREATE TABLE IF NOT EXISTS media_files (
     filename VARCHAR(255) NOT NULL,
     original_name VARCHAR(255) NOT NULL,
     mime_type VARCHAR(100) NOT NULL,
-    size BIGINT NOT NULL,
-    url VARCHAR(500) NOT NULL,
-    uploaded_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    size_bytes BIGINT NOT NULL,
+    url TEXT NOT NULL,
+    uploader_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
