@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import PostCard from '../components/Social/PostCard';
+import { PostCard, SkeletonLoader } from '../components/wren';
 import CommentSection from '../components/Social/CommentSection';
 import type { Post } from '../types';
 import api from '../services/api';
@@ -103,34 +103,22 @@ const PostDetail: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="post-detail-page">
-        <div className="post-detail-container">
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>Loading post...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <SkeletonLoader count={2} />;
   }
 
   if (error || !post) {
     return (
-      <div className="post-detail-page">
-        <div className="post-detail-container">
-          <div className="error-message">
-            <div className="error-icon">⚠️</div>
-            <h3>Post Not Found</h3>
-            <p>{error || 'The post you\'re looking for doesn\'t exist or has been deleted.'}</p>
-            <button 
-              onClick={() => navigate('/feed')}
-              className="back-to-feed-btn"
-            >
-              Back to Feed
-            </button>
-          </div>
-        </div>
+      <div className="wren-empty-state">
+        <h2 className="wren-empty-title">Letter not found</h2>
+        <p className="type-ui-m" style={{ maxWidth: '48ch' }}>
+          {error || 'This letter doesn’t exist or may have been removed by its author.'}
+        </p>
+        <button 
+          onClick={() => navigate('/feed')}
+          className="wren-btn wren-btn-secondary"
+        >
+          Return to Feed
+        </button>
       </div>
     );
   }

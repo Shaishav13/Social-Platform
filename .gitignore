@@ -151,10 +151,18 @@ dist/
 build/
 out/
 
-# Frontend specific
+# Workspace specific
 frontend/dist/
 frontend/build/
 frontend/.vite/
+frontend/node_modules/
+backend/dist/
+backend/build/
+backend/node_modules/
+backend/uploads/
+backend/.env
+backend/.env.*
+backend/coverage/
 
 # Docker
 .dockerignore

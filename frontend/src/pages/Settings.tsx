@@ -1,0 +1,503 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import api from '../services/api';
+
+const Settings: React.FC = () => {
+  const { user, updateUser, logout } = useAuth();
+  const { theme, density, toggleTheme, toggleDensity } = useTheme();
+  const navigate = useNavigate();
+
+  const [isPrivate, setIsPrivate] = useState<boolean>(Boolean(user?.isPrivate));
+  const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
+  const [privacySuccess, setPrivacySuccess] = useState('');
+  const [privacyError, setPrivacyError] = useState('');
+
+  // Delete Account Modal State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const handleTogglePrivacy = async (newVal: boolean) => {
+    setIsUpdatingPrivacy(true);
+    setPrivacyError('');
+    setPrivacySuccess('');
+
+    try {
+      const response = await api.put('/auth/profile', {
+        isPrivate: newVal
+      });
+
+      if (response.data.success) {
+        setIsPrivate(newVal);
+        updateUser({ ...user, isPrivate: newVal });
+        setPrivacySuccess(
+          newVal
+            ? 'Account set to Private. Only approved readers can view your correspondence.'
+            : 'Account set to Public. Anyone on UdtaBirdie can now read and follow you.'
+        );
+      }
+    } catch (err: any) {
+      console.error('Failed to update privacy:', err);
+      setPrivacyError(err.response?.data?.message || 'Failed to update privacy setting. Please try again.');
+    } finally {
+      setIsUpdatingPrivacy(false);
+    }
+  };
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletePassword) {
+      setDeleteError('Please enter your password to confirm account deletion.');
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError('');
+
+    try {
+      await api.delete('/auth/account', {
+        data: { password: deletePassword }
+      });
+      setShowDeleteModal(false);
+      logout();
+      navigate('/login');
+    } catch (err: any) {
+      console.error('Account deletion error:', err);
+      setDeleteError(err.response?.data?.message || 'Failed to delete account. Please verify your password.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (!user) {
+    return (
+      <div style={{ maxWidth: '480px', margin: '60px auto 0', padding: '0 16px' }}>
+        <div className="wren-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>⚙️</div>
+          <h2 className="type-display-m" style={{ marginBottom: '8px' }}>Authentication Required</h2>
+          <p className="type-ui-m" style={{ color: 'var(--ink-600)', marginBottom: '24px' }}>
+            Please log in to manage your account settings and privacy preferences.
+          </p>
+          <Link to="/login" className="wren-button wren-button--wine">
+            Log In to UdtaBirdie
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="wren-settings-page" style={{ maxWidth: '680px', margin: '24px auto 80px', padding: '0 20px' }}>
+      {/* Navigation Breadcrumb */}
+      <div style={{ marginBottom: '20px' }}>
+        <Link
+          to={`/profile/${user.id}`}
+          className="wren-button wren-button--ghost"
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            gap: '8px',
+            display: 'inline-flex',
+            alignItems: 'center'
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          Back to Profile
+        </Link>
+      </div>
+
+      {/* Page Title & Subtitle */}
+      <div style={{ marginBottom: '28px' }}>
+        <h1 className="type-display-l" style={{ margin: '0 0 6px' }}>
+          Account Settings
+        </h1>
+        <p className="type-ui-m" style={{ color: 'var(--ink-600)', margin: 0 }}>
+          Manage your correspondence privacy, reading appearance, and account preferences.
+        </p>
+      </div>
+
+      {/* SECTION 1: ACCOUNT PRIVACY & VISIBILITY */}
+      <div className="wren-card" style={{ marginBottom: '28px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '20px' }}>{isPrivate ? '🔒' : '🌍'}</span>
+              <h2 className="type-display-m" style={{ margin: 0, fontSize: '1.25rem' }}>
+                Account Privacy
+              </h2>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  backgroundColor: isPrivate ? 'rgba(162, 63, 46, 0.12)' : 'rgba(75, 107, 78, 0.12)',
+                  color: isPrivate ? 'var(--rust-alert)' : 'var(--moss-600)',
+                  border: `1px solid ${isPrivate ? 'var(--rust-alert)' : 'var(--moss-600)'}`
+                }}
+              >
+                {isPrivate ? 'Private' : 'Public'}
+              </span>
+            </div>
+            <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: 0 }}>
+              Determine whether your letters and inscription are visible to all readers or restricted to approved followers.
+            </p>
+          </div>
+
+          <label className="wren-switch" style={{ flexShrink: 0, marginTop: '4px' }}>
+            <input
+              type="checkbox"
+              id="settings-privacy-toggle"
+              checked={isPrivate}
+              onChange={(e) => handleTogglePrivacy(e.target.checked)}
+              disabled={isUpdatingPrivacy}
+            />
+            <span className="wren-switch-slider"></span>
+          </label>
+        </div>
+
+        {privacySuccess && (
+          <div className="wren-admin-alert wren-admin-alert--success" style={{ margin: '14px 0' }} role="status">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <span>{privacySuccess}</span>
+          </div>
+        )}
+
+        {privacyError && (
+          <div className="wren-error" style={{ margin: '14px 0' }} role="alert">
+            {privacyError}
+          </div>
+        )}
+
+        {/* Privacy Comparison Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginTop: '18px' }}>
+          <div
+            onClick={() => !isUpdatingPrivacy && isPrivate && handleTogglePrivacy(false)}
+            style={{
+              padding: '16px',
+              backgroundColor: !isPrivate ? 'var(--paper-100)' : 'var(--paper-200)',
+              border: `1.5px solid ${!isPrivate ? 'var(--wine-700)' : 'var(--border)'}`,
+              borderRadius: 'var(--radius-sm)',
+              cursor: isPrivate ? 'pointer' : 'default',
+              transition: 'all var(--transition-fast)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '14px', color: 'var(--ink-900)' }}>
+                <span>🌍</span> Public Account
+              </div>
+              {!isPrivate && (
+                <span style={{ color: 'var(--wine-700)', fontSize: '12px', fontWeight: 600 }}>Active</span>
+              )}
+            </div>
+            <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--ink-600)', lineHeight: 1.45 }}>
+              Anyone on UdtaBirdie can read your letters, view your replies, and follow your correspondence directly without confirmation.
+            </p>
+          </div>
+
+          <div
+            onClick={() => !isUpdatingPrivacy && !isPrivate && handleTogglePrivacy(true)}
+            style={{
+              padding: '16px',
+              backgroundColor: isPrivate ? 'var(--paper-100)' : 'var(--paper-200)',
+              border: `1.5px solid ${isPrivate ? 'var(--wine-700)' : 'var(--border)'}`,
+              borderRadius: 'var(--radius-sm)',
+              cursor: !isPrivate ? 'pointer' : 'default',
+              transition: 'all var(--transition-fast)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '14px', color: 'var(--ink-900)' }}>
+                <span>🔒</span> Private Account
+              </div>
+              {isPrivate && (
+                <span style={{ color: 'var(--wine-700)', fontSize: '12px', fontWeight: 600 }}>Active</span>
+              )}
+            </div>
+            <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--ink-600)', lineHeight: 1.45 }}>
+              Only readers you approve can view your correspondence. Incoming followers must submit a request for your approval.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 2: READING MATERIAL & APPEARANCE */}
+      <div className="wren-card" style={{ marginBottom: '28px' }}>
+        <h2 className="type-display-m" style={{ margin: '0 0 4px', fontSize: '1.25rem' }}>
+          Reading Material & Appearance
+        </h2>
+        <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: '0 0 20px' }}>
+          Personalize the tactile aesthetic and text density of your reading interface.
+        </p>
+
+        {/* Theme Material Options */}
+        <div style={{ marginBottom: '20px' }}>
+          <label className="wren-label" style={{ marginBottom: '10px' }}>
+            Vellum Paper Theme
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => theme === 'dark' && toggleTheme()}
+              className="wren-button"
+              style={{
+                backgroundColor: theme === 'light' ? 'var(--paper-100)' : 'var(--paper-200)',
+                border: `1.5px solid ${theme === 'light' ? 'var(--wine-700)' : 'var(--border)'}`,
+                color: 'var(--ink-900)',
+                padding: '14px',
+                justifyContent: 'flex-start',
+                borderRadius: 'var(--radius-sm)',
+                gap: '12px'
+              }}
+            >
+              <span style={{ fontSize: '20px' }}>☀️</span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 600, fontSize: '13.5px' }}>Paper Vellum (Light)</div>
+                <div style={{ fontSize: '12px', color: 'var(--ink-600)', fontWeight: 400 }}>Greige paper & ink</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => theme === 'light' && toggleTheme()}
+              className="wren-button"
+              style={{
+                backgroundColor: theme === 'dark' ? 'var(--paper-100)' : 'var(--paper-200)',
+                border: `1.5px solid ${theme === 'dark' ? 'var(--wine-700)' : 'var(--border)'}`,
+                color: 'var(--ink-900)',
+                padding: '14px',
+                justifyContent: 'flex-start',
+                borderRadius: 'var(--radius-sm)',
+                gap: '12px'
+              }}
+            >
+              <span style={{ fontSize: '20px' }}>🌙</span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 600, fontSize: '13.5px' }}>Night Study (Dark)</div>
+                <div style={{ fontSize: '12px', color: 'var(--ink-600)', fontWeight: 400 }}>Dark paper & luminous ink</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Reading Density Options */}
+        <div>
+          <label className="wren-label" style={{ marginBottom: '10px' }}>
+            Correspondence Density
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => density === 'compact' && toggleDensity()}
+              className="wren-button"
+              style={{
+                backgroundColor: density === 'comfortable' ? 'var(--paper-100)' : 'var(--paper-200)',
+                border: `1.5px solid ${density === 'comfortable' ? 'var(--wine-700)' : 'var(--border)'}`,
+                color: 'var(--ink-900)',
+                padding: '14px',
+                justifyContent: 'flex-start',
+                borderRadius: 'var(--radius-sm)',
+                gap: '12px'
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>📖</span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 600, fontSize: '13.5px' }}>Comfortable</div>
+                <div style={{ fontSize: '12px', color: 'var(--ink-600)', fontWeight: 400 }}>32px editorial rhythm</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => density === 'comfortable' && toggleDensity()}
+              className="wren-button"
+              style={{
+                backgroundColor: density === 'compact' ? 'var(--paper-100)' : 'var(--paper-200)',
+                border: `1.5px solid ${density === 'compact' ? 'var(--wine-700)' : 'var(--border)'}`,
+                color: 'var(--ink-900)',
+                padding: '14px',
+                justifyContent: 'flex-start',
+                borderRadius: 'var(--radius-sm)',
+                gap: '12px'
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>📜</span>
+              <div style={{ textAlign: 'left' }}>
+                <div style={{ fontWeight: 600, fontSize: '13.5px' }}>Compact</div>
+                <div style={{ fontSize: '12px', color: 'var(--ink-600)', fontWeight: 400 }}>20px dense rhythm</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 3: PROFILE & SECURITY QUICK LINKS */}
+      <div className="wren-card" style={{ marginBottom: '28px' }}>
+        <h2 className="type-display-m" style={{ margin: '0 0 4px', fontSize: '1.25rem' }}>
+          Profile & Security
+        </h2>
+        <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: '0 0 20px' }}>
+          Your public persona, moniker, bio inscription, and login credentials.
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: 'var(--paper-200)', borderRadius: 'var(--radius-sm)', marginBottom: '14px' }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--ink-900)', marginBottom: '2px' }}>
+              Public Inscription & Moniker
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--ink-600)' }}>
+              @{user.username} • {user.email}
+            </div>
+          </div>
+          <Link to="/profile/edit" className="wren-button wren-button--ghost" style={{ fontSize: '13px', padding: '6px 14px' }}>
+            Edit Inscription
+          </Link>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: 'var(--paper-200)', borderRadius: 'var(--radius-sm)' }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--ink-900)', marginBottom: '2px' }}>
+              Authentication Password
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--ink-600)' }}>
+              Protected with 8+ character salted hash
+            </div>
+          </div>
+          <Link to="/profile/edit" className="wren-button wren-button--ghost" style={{ fontSize: '13px', padding: '6px 14px' }}>
+            Change Password
+          </Link>
+        </div>
+      </div>
+
+      {/* SECTION 4: ACCOUNT MANAGEMENT & DANGER ZONE */}
+      <div className="wren-card">
+        <h2 className="type-display-m" style={{ margin: '0 0 4px', fontSize: '1.25rem' }}>
+          Account Actions
+        </h2>
+        <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: '0 0 20px' }}>
+          Session termination and permanent account deletion.
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '18px', marginBottom: '18px', borderBottom: '1px solid var(--border)' }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--ink-900)' }}>
+              Active Session
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--ink-600)' }}>
+              Log out of UdtaBirdie on this device.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
+            className="wren-button wren-button--ghost"
+          >
+            Log Out
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--rust-alert)' }}>
+              Permanent Account Deletion
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--ink-600)' }}>
+              Permanently remove your letters, profile, and all correspondence.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDeleteModal(true)}
+            className="wren-button wren-button--rust"
+          >
+            Delete Account
+          </button>
+        </div>
+      </div>
+
+      {/* Delete Account Modal */}
+      {showDeleteModal && (
+        <div className="wren-modal-overlay" onClick={() => !isDeleting && setShowDeleteModal(false)}>
+          <div className="wren-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="wren-modal-header">
+              <h2 className="type-display-m" style={{ color: 'var(--rust-alert)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>⚠️</span> Confirm Account Deletion
+              </h2>
+              <button
+                type="button"
+                onClick={() => !isDeleting && setShowDeleteModal(false)}
+                className="wren-admin-icon-btn"
+                disabled={isDeleting}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleDeleteAccount} className="wren-modal-form">
+              <p style={{ margin: 0, fontSize: '14px', color: 'var(--ink-900)', lineHeight: 1.5 }}>
+                This action cannot be undone. All your correspondence, manuscript letters, replies, likes, and follow relationships will be permanently removed.
+              </p>
+
+              {deleteError && (
+                <div className="wren-error" role="alert">
+                  {deleteError}
+                </div>
+              )}
+
+              <div className="wren-form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="delete-password" className="wren-label">
+                  Enter your password to confirm:
+                </label>
+                <input
+                  type="password"
+                  id="delete-password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Your current password"
+                  required
+                  disabled={isDeleting}
+                  className="wren-input"
+                  autoFocus
+                />
+              </div>
+
+              <div className="wren-modal-actions">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(false)}
+                  className="wren-button wren-button--ghost"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="wren-button wren-button--rust"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting Account...' : 'Permanently Delete'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Settings;

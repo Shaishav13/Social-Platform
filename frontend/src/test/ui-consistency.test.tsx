@@ -1,13 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { BrowserRouter } from 'react-router-dom';
 import * as fc from 'fast-check';
 import { AuthProvider } from '../contexts/AuthContext';
 import PostCard from '../components/Social/PostCard';
 import CreatePost from '../components/PostCreation/CreatePost';
-import Header from '../components/Layout/Header';
-import type { Post, User } from '../types';
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

@@ -89,6 +89,9 @@ const Header: React.FC = () => {
                   )}
                   <span>{user?.username}</span>
                 </Link>
+                <button onClick={handleLogout} className="nav-link" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                  Logout
+                </button>
               </div>
             </>
           ) : (

@@ -6,17 +6,22 @@ import api from '../services/api';
 const EditProfile: React.FC = () => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState({
     username: '',
-    bio: ''
+    bio: '',
+    isPrivate: false
   });
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
-  
+
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [isUpdating, setIsUpdating] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +34,8 @@ const EditProfile: React.FC = () => {
     if (user) {
       setFormData({
         username: user.username || '',
-        bio: user.bio || ''
+        bio: user.bio || '',
+        isPrivate: Boolean(user.isPrivate)
       });
     }
   }, [user]);
@@ -60,12 +66,12 @@ const EditProfile: React.FC = () => {
 
     // Validate input
     if (formData.username.trim().length < 3) {
-      setError('Username must be at least 3 characters long');
+      setError('Username must be at least 3 characters long.');
       return;
     }
 
     if (formData.bio.length > 500) {
-      setError('Bio must be no more than 500 characters');
+      setError('Bio must be no more than 500 characters.');
       return;
     }
 
@@ -76,22 +82,21 @@ const EditProfile: React.FC = () => {
     try {
       const response = await api.put('/auth/profile', {
         username: formData.username.trim(),
-        bio: formData.bio.trim()
+        bio: formData.bio.trim(),
+        isPrivate: formData.isPrivate
       });
 
       if (response.data.success) {
-        setSuccess('Profile updated successfully!');
-        // Update user context
+        setSuccess('Profile updated successfully! Returning to profile...');
         updateUser(response.data.data);
-        
-        // Redirect after a short delay
+
         setTimeout(() => {
           navigate(`/profile/${user?.id}`);
-        }, 1500);
+        }, 1200);
       }
-    } catch (error: any) {
-      console.error('Profile update failed:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to update profile';
+    } catch (err: any) {
+      console.error('Profile update failed:', err);
+      const errorMessage = err.response?.data?.message || 'Failed to update profile. Please try again.';
       setError(errorMessage);
     } finally {
       setIsUpdating(false);
@@ -102,30 +107,28 @@ const EditProfile: React.FC = () => {
     e.preventDefault();
     if (isChangingPassword) return;
 
-    // Validate passwords
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-      setPasswordError('All password fields are required');
+      setPasswordError('All password fields are required.');
       return;
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordError('New passwords do not match');
+      setPasswordError('New passwords do not match.');
       return;
     }
 
     if (passwordData.newPassword.length < 8) {
-      setPasswordError('New password must be at least 8 characters long');
+      setPasswordError('New password must be at least 8 characters long.');
       return;
     }
 
-    // Check password strength
     const hasUpperCase = /[A-Z]/.test(passwordData.newPassword);
     const hasLowerCase = /[a-z]/.test(passwordData.newPassword);
     const hasNumbers = /\d/.test(passwordData.newPassword);
     const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(passwordData.newPassword);
 
     if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
-      setPasswordError('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character');
+      setPasswordError('Password must meet all five security requirements below.');
       return;
     }
 
@@ -140,213 +143,534 @@ const EditProfile: React.FC = () => {
       });
 
       if (response.data.success) {
-        setPasswordSuccess('Password changed successfully! You will be logged out.');
+        setPasswordSuccess('Password changed successfully! Redirecting to login...');
         setPasswordData({
           currentPassword: '',
           newPassword: '',
           confirmPassword: ''
         });
-        
-        // Redirect to login after a short delay
+
         setTimeout(() => {
           navigate('/login');
-        }, 2000);
+        }, 1800);
       }
-    } catch (error: any) {
-      console.error('Password change failed:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to change password';
+    } catch (err: any) {
+      console.error('Password change failed:', err);
+      const errorMessage = err.response?.data?.message || 'Failed to change password. Please check your current password.';
       setPasswordError(errorMessage);
     } finally {
       setIsChangingPassword(false);
     }
   };
 
+  // Live password requirement flags
+  const pwd = passwordData.newPassword;
+  const checks = {
+    length: pwd.length >= 8,
+    upper: /[A-Z]/.test(pwd),
+    lower: /[a-z]/.test(pwd),
+    number: /\d/.test(pwd),
+    special: /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
+  };
+
   if (!user) {
     return (
-      <div className="edit-profile-page">
-        <div className="auth-required">
-          <h2>Authentication Required</h2>
-          <p>Please log in to edit your profile.</p>
-          <Link to="/login" className="btn btn-primary">Log In</Link>
+      <div style={{ maxWidth: '480px', margin: '60px auto 0', padding: '0 16px' }}>
+        <div className="wren-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>🔐</div>
+          <h2 className="type-display-m" style={{ marginBottom: '8px' }}>Authentication Required</h2>
+          <p className="type-ui-m" style={{ color: 'var(--ink-600)', marginBottom: '24px' }}>
+            Please log in to edit your profile and account settings.
+          </p>
+          <Link to="/login" className="wren-button wren-button--wine">
+            Log In to UdtaBirdie
+          </Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="edit-profile-page">
-      <div className="edit-profile-container">
-        <div className="edit-profile-header">
-          <Link to={`/profile/${user.id}`} className="back-btn">
-            ← Back to Profile
-          </Link>
-          <h1>Edit Profile</h1>
+    <div className="wren-edit-profile-page" style={{ maxWidth: '680px', margin: '24px auto 80px', padding: '0 20px' }}>
+      {/* Navigation Breadcrumb / Back Link */}
+      <div style={{ marginBottom: '20px' }}>
+        <Link
+          to={`/profile/${user.id}`}
+          className="wren-button wren-button--ghost"
+          style={{
+            padding: '6px 14px',
+            fontSize: '13px',
+            gap: '8px',
+            display: 'inline-flex',
+            alignItems: 'center'
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          Back to Profile
+        </Link>
+      </div>
+
+      {/* Page Title & Intro */}
+      <div style={{ marginBottom: '28px' }}>
+        <h1 className="type-display-l" style={{ margin: '0 0 6px' }}>
+          Edit Profile
+        </h1>
+        <p className="type-ui-m" style={{ color: 'var(--ink-600)', margin: 0 }}>
+          Refine your public moniker, correspondence bio, and security credentials.
+        </p>
+      </div>
+
+      {/* Section 1: Profile Information */}
+      <div className="wren-card" style={{ marginBottom: '32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
+          {user.profilePicture ? (
+            <img
+              src={user.profilePicture}
+              alt={user.username}
+              className="wren-avatar"
+              style={{ width: '56px', height: '56px', objectFit: 'cover' }}
+            />
+          ) : (
+            <div
+              className="wren-avatar-placeholder"
+              style={{ width: '56px', height: '56px', fontSize: '20px' }}
+            >
+              {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
+            </div>
+          )}
+          <div>
+            <h2 className="type-display-m" style={{ margin: '0 0 4px', fontSize: '1.25rem' }}>
+              Profile Information
+            </h2>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', fontSize: '13px', color: 'var(--ink-600)' }}>
+              <span>@{user.username}</span>
+              <span>•</span>
+              <span>{user.email}</span>
+            </div>
+          </div>
         </div>
 
-        {/* Profile Edit Form */}
-        <div className="edit-profile-content">
-          <div className="edit-section">
-            <h2>Profile Information</h2>
-            
-            <form onSubmit={handleProfileUpdate} className="profile-form">
-              <div className="form-group">
-                <label htmlFor="username">Username</label>
-                <input
-                  type="text"
-                  id="username"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleInputChange}
-                  placeholder="Enter your username"
-                  minLength={3}
-                  maxLength={50}
-                  required
-                  disabled={isUpdating}
-                />
-                <small className="form-help">
-                  Username must be 3-50 characters long and can only contain letters, numbers, and underscores.
-                </small>
-              </div>
+        {error && (
+          <div className="wren-error" role="alert" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>{error}</span>
+          </div>
+        )}
 
-              <div className="form-group">
-                <label htmlFor="bio">Bio</label>
-                <textarea
-                  id="bio"
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleInputChange}
-                  placeholder="Tell us about yourself..."
-                  maxLength={500}
-                  rows={4}
-                  disabled={isUpdating}
-                />
-                <small className="form-help">
-                  {formData.bio.length}/500 characters
-                </small>
-              </div>
+        {success && (
+          <div className="wren-admin-alert wren-admin-alert--success" role="status">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <span>{success}</span>
+          </div>
+        )}
 
-              {error && (
-                <div className="error-message">
-                  {error}
-                </div>
-              )}
-
-              {success && (
-                <div className="success-message">
-                  {success}
-                </div>
-              )}
-
-              <div className="form-actions">
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={isUpdating}
-                >
-                  {isUpdating ? 'Updating...' : 'Update Profile'}
-                </button>
-                <Link to={`/profile/${user.id}`} className="btn btn-secondary">
-                  Cancel
-                </Link>
-              </div>
-            </form>
+        <form onSubmit={handleProfileUpdate}>
+          {/* Username Field */}
+          <div className="wren-form-group">
+            <label htmlFor="username" className="wren-label">
+              Username
+            </label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              value={formData.username}
+              onChange={handleInputChange}
+              placeholder="e.g. roger_ascham"
+              minLength={3}
+              maxLength={50}
+              required
+              disabled={isUpdating}
+              className="wren-input"
+              autoComplete="username"
+            />
+            <small style={{ color: 'var(--ink-600)', fontSize: '12.5px', marginTop: '4px', display: 'block' }}>
+              Username must be 3–50 characters long and can only contain letters, numbers, and underscores.
+            </small>
           </div>
 
-          {/* Password Change Section */}
-          <div className="edit-section">
-            <div className="section-header">
-              <h2>Change Password</h2>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setShowPasswordSection(!showPasswordSection)}
+          {/* Bio Field */}
+          <div className="wren-form-group">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="bio" className="wren-label">
+                Bio & Inscription
+              </label>
+              <span
+                style={{
+                  fontSize: '12.5px',
+                  fontFamily: 'var(--font-sans)',
+                  color: formData.bio.length > 480 ? 'var(--rust-alert)' : 'var(--ink-600)'
+                }}
               >
-                {showPasswordSection ? 'Hide' : 'Show'}
-              </button>
+                {formData.bio.length}/500 characters
+              </span>
+            </div>
+            <textarea
+              id="bio"
+              name="bio"
+              value={formData.bio}
+              onChange={handleInputChange}
+              placeholder="Tell readers about your thoughts, crafts, or background..."
+              maxLength={500}
+              rows={4}
+              disabled={isUpdating}
+              className="wren-textarea"
+            />
+            <small style={{ color: 'var(--ink-600)', fontSize: '12.5px', marginTop: '4px', display: 'block' }}>
+              A brief inscription displayed at the head of your public page.
+            </small>
+          </div>
+
+          {/* Account Privacy Setting */}
+          <div
+            style={{
+              padding: '16px 18px',
+              backgroundColor: 'var(--paper-200)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              marginTop: '8px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: '16px'
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '18px' }}>{formData.isPrivate ? '🔒' : '🌍'}</span>
+                <span style={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--ink-900)' }}>
+                  {formData.isPrivate ? 'Private Account' : 'Public Account'}
+                </span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    backgroundColor: formData.isPrivate ? 'rgba(162, 63, 46, 0.12)' : 'rgba(75, 107, 78, 0.12)',
+                    color: formData.isPrivate ? 'var(--rust-alert)' : 'var(--moss-600)',
+                    border: `1px solid ${formData.isPrivate ? 'var(--rust-alert)' : 'var(--moss-600)'}`
+                  }}
+                >
+                  {formData.isPrivate ? 'Protected' : 'Open'}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--ink-600)', lineHeight: 1.45 }}>
+                {formData.isPrivate
+                  ? 'Only readers you approve via Follow Requests can read your letters and profile. New followers must be confirmed.'
+                  : 'Anyone on UdtaBirdie can read your correspondence, view your inscriptions, and follow you directly.'}
+              </p>
+            </div>
+            <label className="wren-switch" style={{ marginTop: '2px', flexShrink: 0 }}>
+              <input
+                type="checkbox"
+                id="isPrivate"
+                name="isPrivate"
+                checked={formData.isPrivate}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, isPrivate: e.target.checked }));
+                  setError('');
+                  setSuccess('');
+                }}
+                disabled={isUpdating}
+              />
+              <span className="wren-switch-slider"></span>
+            </label>
+          </div>
+
+          {/* Form Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+            <button
+              type="submit"
+              className="wren-button wren-button--wine"
+              disabled={isUpdating}
+              style={{ minWidth: '130px' }}
+            >
+              {isUpdating ? 'Updating...' : 'Update Profile'}
+            </button>
+            <Link to={`/profile/${user.id}`} className="wren-button wren-button--ghost">
+              Cancel
+            </Link>
+          </div>
+        </form>
+      </div>
+
+      {/* Section 2: Change Password (Accordion) */}
+      <div className="wren-card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h2 className="type-display-m" style={{ margin: '0 0 4px', fontSize: '1.25rem' }}>
+              Change Password
+            </h2>
+            <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: 0 }}>
+              Update the security credentials used to sign in to your account.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="wren-button wren-button--ghost"
+            onClick={() => setShowPasswordSection(!showPasswordSection)}
+            style={{ fontSize: '13px', padding: '6px 14px' }}
+            aria-expanded={showPasswordSection}
+          >
+            {showPasswordSection ? 'Hide' : 'Show Password Fields'}
+          </button>
+        </div>
+
+        {showPasswordSection && (
+          <form onSubmit={handlePasswordUpdate} style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border)' }}>
+            {passwordError && (
+              <div className="wren-error" role="alert" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            {passwordSuccess && (
+              <div className="wren-admin-alert wren-admin-alert--success" role="status">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <span>{passwordSuccess}</span>
+              </div>
+            )}
+
+            {/* Current Password */}
+            <div className="wren-form-group">
+              <label htmlFor="currentPassword" className="wren-label">
+                Current Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  id="currentPassword"
+                  name="currentPassword"
+                  value={passwordData.currentPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="Enter your current password"
+                  required
+                  disabled={isChangingPassword}
+                  className="wren-input"
+                  style={{ paddingRight: '40px' }}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--ink-600)',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
+                >
+                  {showCurrentPassword ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
-            {showPasswordSection && (
-              <form onSubmit={handlePasswordUpdate} className="password-form">
-                <div className="form-group">
-                  <label htmlFor="currentPassword">Current Password</label>
-                  <input
-                    type="password"
-                    id="currentPassword"
-                    name="currentPassword"
-                    value={passwordData.currentPassword}
-                    onChange={handlePasswordChange}
-                    placeholder="Enter your current password"
-                    required
-                    disabled={isChangingPassword}
-                  />
-                </div>
+            {/* New Password */}
+            <div className="wren-form-group">
+              <label htmlFor="newPassword" className="wren-label">
+                New Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  id="newPassword"
+                  name="newPassword"
+                  value={passwordData.newPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="Enter your new password"
+                  minLength={8}
+                  required
+                  disabled={isChangingPassword}
+                  className="wren-input"
+                  style={{ paddingRight: '40px' }}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--ink-600)',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                >
+                  {showNewPassword ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
 
-                <div className="form-group">
-                  <label htmlFor="newPassword">New Password</label>
-                  <input
-                    type="password"
-                    id="newPassword"
-                    name="newPassword"
-                    value={passwordData.newPassword}
-                    onChange={handlePasswordChange}
-                    placeholder="Enter your new password"
-                    minLength={8}
-                    required
-                    disabled={isChangingPassword}
-                  />
-                </div>
+            {/* Confirm Password */}
+            <div className="wren-form-group">
+              <label htmlFor="confirmPassword" className="wren-label">
+                Confirm New Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  value={passwordData.confirmPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="Confirm your new password"
+                  minLength={8}
+                  required
+                  disabled={isChangingPassword}
+                  className="wren-input"
+                  style={{ paddingRight: '40px' }}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--ink-600)',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                  {showConfirmPassword ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
 
-                <div className="form-group">
-                  <label htmlFor="confirmPassword">Confirm New Password</label>
-                  <input
-                    type="password"
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    value={passwordData.confirmPassword}
-                    onChange={handlePasswordChange}
-                    placeholder="Confirm your new password"
-                    minLength={8}
-                    required
-                    disabled={isChangingPassword}
-                  />
-                </div>
+            {/* Real-time Password Requirements Checklist */}
+            <div
+              style={{
+                backgroundColor: 'var(--paper-200)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '14px 16px',
+                marginTop: '16px',
+                marginBottom: '20px'
+              }}
+            >
+              <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--ink-900)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Password Requirements
+              </div>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: checks.length ? 'var(--moss-600)' : 'var(--ink-600)' }}>
+                  <span style={{ display: 'inline-block', width: '14px', textAlign: 'center', fontWeight: 'bold' }}>
+                    {checks.length ? '✓' : '•'}
+                  </span>
+                  <span>At least 8 characters</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: checks.upper ? 'var(--moss-600)' : 'var(--ink-600)' }}>
+                  <span style={{ display: 'inline-block', width: '14px', textAlign: 'center', fontWeight: 'bold' }}>
+                    {checks.upper ? '✓' : '•'}
+                  </span>
+                  <span>One uppercase letter (A–Z)</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: checks.lower ? 'var(--moss-600)' : 'var(--ink-600)' }}>
+                  <span style={{ display: 'inline-block', width: '14px', textAlign: 'center', fontWeight: 'bold' }}>
+                    {checks.lower ? '✓' : '•'}
+                  </span>
+                  <span>One lowercase letter (a–z)</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: checks.number ? 'var(--moss-600)' : 'var(--ink-600)' }}>
+                  <span style={{ display: 'inline-block', width: '14px', textAlign: 'center', fontWeight: 'bold' }}>
+                    {checks.number ? '✓' : '•'}
+                  </span>
+                  <span>One number (0–9)</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px', color: checks.special ? 'var(--moss-600)' : 'var(--ink-600)' }}>
+                  <span style={{ display: 'inline-block', width: '14px', textAlign: 'center', fontWeight: 'bold' }}>
+                    {checks.special ? '✓' : '•'}
+                  </span>
+                  <span>One special character (!@#$%^&*)</span>
+                </li>
+              </ul>
+            </div>
 
-                <div className="password-requirements">
-                  <small>Password must contain:</small>
-                  <ul>
-                    <li>At least 8 characters</li>
-                    <li>One uppercase letter</li>
-                    <li>One lowercase letter</li>
-                    <li>One number</li>
-                    <li>One special character (!@#$%^&*)</li>
-                  </ul>
-                </div>
-
-                {passwordError && (
-                  <div className="error-message">
-                    {passwordError}
-                  </div>
-                )}
-
-                {passwordSuccess && (
-                  <div className="success-message">
-                    {passwordSuccess}
-                  </div>
-                )}
-
-                <div className="form-actions">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={isChangingPassword}
-                  >
-                    {isChangingPassword ? 'Changing...' : 'Change Password'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button
+                type="submit"
+                className="wren-button wren-button--wine"
+                disabled={isChangingPassword}
+                style={{ minWidth: '160px' }}
+              >
+                {isChangingPassword ? 'Changing Password...' : 'Update Password'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

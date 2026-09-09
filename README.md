@@ -84,12 +84,10 @@ cd social-platform
 ### 2. Install Dependencies
 ```bash
 # Install backend dependencies
-npm install
+cd backend && npm install && cd ..
 
 # Install frontend dependencies
-cd frontend
-npm install
-cd ..
+cd frontend && npm install && cd ..
 ```
 
 ### 3. Database Setup
@@ -98,13 +96,13 @@ cd ..
 createdb social_media_platform
 
 # Run database initialization
-psql -d social_media_platform -f scripts/init-db.sql
+psql -d social_media_platform -f backend/scripts/init-db.sql
 ```
 
 ### 4. Environment Configuration
 ```bash
 # Copy environment files
-cp .env.example .env
+cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 
 # Edit .env files with your configuration
@@ -112,12 +110,11 @@ cp frontend/.env.example frontend/.env
 
 ### 5. Start the Application
 ```bash
-# Start backend (development)
-npm run dev
+# Start backend (development) from root:
+npm run dev:backend
 
-# Start frontend (in another terminal)
-cd frontend
-npm run dev
+# Start frontend (in another terminal):
+npm run dev:frontend
 ```
 
 The application will be available at:

@@ -7,17 +7,21 @@ const Home: React.FC = () => {
 
   if (isAuthenticated) {
     return (
-      <div className="welcome-section">
-        <div className="welcome-hero">
-          <div className="welcome-icon">🐦</div>
-          <h1>Welcome back to UdtaBirdie</h1>
-          <p>Share moments, connect with friends, and discover amazing content.</p>
-          <div className="quick-actions">
-            <Link to="/feed" className="btn btn-primary">
-              View Feed
+      <div style={{ padding: '40px 0' }}>
+        <div style={{ marginBottom: '32px' }}>
+          <h1 className="type-display-l" style={{ marginBottom: '12px' }}>
+            Welcome to UdtaBirdie
+          </h1>
+          <p className="type-body-serif" style={{ color: 'var(--ink-600)', marginBottom: '24px' }}>
+            A social platform for people who write, not just post. Treat every thought like correspondence.
+          </p>
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Link to="/feed" className="wren-btn wren-btn-primary">
+              Open Feed
             </Link>
-            <Link to="/create-post" className="btn btn-secondary">
-              Create Post
+            <Link to="/create-post" className="wren-btn wren-btn-secondary">
+              Write a Letter
             </Link>
           </div>
         </div>
@@ -26,61 +30,51 @@ const Home: React.FC = () => {
   }
 
   return (
-    <div className="home-page">
-      <div className="hero-section">
-        <div className="hero-content">
-          <div className="hero-icon">🐦</div>
-          <h1>Welcome to UdtaBirdie</h1>
-          <p className="hero-subtitle">
-            Connect with friends and the world around you on UdtaBirdie.
-          </p>
-          <div className="cta-buttons">
-            <Link to="/register" className="btn btn-primary btn-lg">
-              Sign Up
-            </Link>
-            <Link to="/login" className="btn btn-secondary btn-lg">
-              Log In
-            </Link>
-          </div>
-        </div>
-      </div>
-      
-      <div className="features-section">
-        <div className="features-header">
-          <h2>Connect and Share</h2>
-          <p>See photos and updates from friends in your feed.</p>
-        </div>
-        <div className="features-grid">
-          <div className="feature-card">
-            <div className="feature-icon">📸</div>
-            <h3>Share Photos</h3>
-            <p>Upload and share your favorite moments with friends and followers.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">👥</div>
-            <h3>Connect</h3>
-            <p>Follow friends and discover new people with similar interests.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">💬</div>
-            <h3>Engage</h3>
-            <p>Like, comment, and share posts to stay connected with your community.</p>
-          </div>
-          <div className="feature-card">
-            <div className="feature-icon">🔍</div>
-            <h3>Discover</h3>
-            <p>Explore trending content and find new accounts to follow.</p>
-          </div>
+    <div style={{ padding: '40px 0' }}>
+      <div style={{ marginBottom: '40px' }}>
+        <h1 className="type-display-l" style={{ marginBottom: '14px' }}>
+          UdtaBirdie
+        </h1>
+        <p className="type-body-serif" style={{ color: 'var(--ink-600)', marginBottom: '28px' }}>
+          A platform for people who write, not just post. Letters, thoughts, and conversations treated like print on paper.
+        </p>
+
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <Link to="/register" className="wren-btn wren-btn-primary">
+            Join the Correspondence
+          </Link>
+          <Link to="/login" className="wren-btn wren-btn-secondary">
+            Sign In
+          </Link>
         </div>
       </div>
 
-      <div className="cta-section">
-        <div className="cta-content">
-          <h2>Ready to get started?</h2>
-          <p>Join millions of people sharing their stories on UdtaBirdie.</p>
-          <Link to="/register" className="btn btn-primary btn-lg">
-            Create Account
-          </Link>
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
+        <div className="type-display-m" style={{ marginBottom: '20px', fontSize: '20px' }}>
+          Guiding Principles
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ paddingBottom: '16px', borderBottom: '1px dashed var(--border)' }}>
+            <h2 className="type-ui-l" style={{ marginBottom: '4px' }}>Written with Intent</h2>
+            <p className="type-ui-m">
+              No endless feeds of noise. Thoughtful prose, essays, and notes read at a measured pace.
+            </p>
+          </div>
+
+          <div style={{ paddingBottom: '16px', borderBottom: '1px dashed var(--border)' }}>
+            <h2 className="type-ui-l" style={{ marginBottom: '4px' }}>Ink & Vellum Aesthetic</h2>
+            <p className="type-ui-m">
+              Texture and hierarchy derived from typography, whitespace, and physical press states.
+            </p>
+          </div>
+
+          <div>
+            <h2 className="type-ui-l" style={{ marginBottom: '4px' }}>Meaningful Dialogue</h2>
+            <p className="type-ui-m">
+              Replies treated as margin notes and letters in a shared thread.
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { User, Post } from '../types';
-import PostCard from '../components/Social/PostCard';
+import { PostCard, ProfileHeader, SkeletonLoader } from '../components/wren';
 import api from '../services/api';
 
 const Profile: React.FC = () => {
@@ -288,14 +288,6 @@ const Profile: React.FC = () => {
     setDeletePassword('');
   };
 
-  const getJoinDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long' 
-    });
-  };
-
   const canViewPosts = () => {
     if (isOwnProfile) return true;
     if (!profileUser?.isPrivate) return true;
@@ -303,185 +295,33 @@ const Profile: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="profile-page">
-        <div className="profile-loading">
-          <div className="loading-spinner"></div>
-          <p>Loading profile...</p>
-        </div>
-      </div>
-    );
+    return <SkeletonLoader count={3} />;
   }
 
   if (error || !profileUser) {
     return (
-      <div className="profile-page">
-        <div className="profile-error">
-          <div className="error-icon">😔</div>
-          <h2>Profile not found</h2>
-          <p>{error || 'The user you are looking for does not exist.'}</p>
-          <Link to="/feed" className="btn btn-primary">
-            Back to Feed
-          </Link>
-        </div>
+      <div className="wren-empty-state">
+        <h2 className="wren-empty-title">Profile not found</h2>
+        <p className="type-ui-m">{error || 'The user you are looking for does not exist.'}</p>
+        <Link to="/feed" className="wren-btn wren-btn-secondary">
+          Return to Feed
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="profile-page">
-      {/* Profile Cover */}
-      <div className="profile-cover">
-        <div className="cover-gradient"></div>
-      </div>
-
-      <div className="profile-container">
-        {/* Profile Header */}
-        <div className="profile-header">
-          <div className="profile-main-section">
-            <div className="profile-left">
-              <div className="profile-avatar-section">
-                <div className="avatar-container">
-                  {profileUser.profilePicture ? (
-                    <img 
-                      src={profileUser.profilePicture} 
-                      alt={profileUser.username}
-                      className="profile-avatar-medium"
-                    />
-                  ) : (
-                    <div className="profile-avatar-medium-placeholder">
-                      {profileUser.username.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  {profileUser.isPrivate && (
-                    <div className="privacy-badge" title="Private Account">
-                      🔒
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="profile-center">
-              <div className="profile-name-section">
-                <h1 className="profile-username">{profileUser.username}</h1>
-                <div className="profile-meta">
-                  <span className="join-date">
-                    Joined {getJoinDate(profileUser.createdAt)}
-                  </span>
-                  {profileUser.isPrivate && (
-                    <span className="privacy-indicator">
-                      Private Account
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {profileUser.bio && (
-                <div className="profile-bio">
-                  <p>{profileUser.bio}</p>
-                </div>
-              )}
-
-              <div className="profile-stats">
-                <div className="stat-item">
-                  <span className="stat-number">{postCount}</span>
-                  <span className="stat-label">Posts</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">{followerCount}</span>
-                  <span className="stat-label">Followers</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-number">{followingCount}</span>
-                  <span className="stat-label">Following</span>
-                </div>
-              </div>
-
-              {!isOwnProfile && (
-                <div className="profile-follow-action">
-                  <button
-                    onClick={handleFollowToggle}
-                    disabled={isFollowLoading}
-                    className={`btn ${
-                      isFollowing 
-                        ? 'btn-following' 
-                        : isRequested 
-                          ? 'btn-requested' 
-                          : 'btn-follow'
-                    }`}
-                  >
-                    {isFollowLoading ? (
-                      <span className="loading-dots">...</span>
-                    ) : isFollowing ? (
-                      <>
-                        <span className="follow-icon">✓</span>
-                        Following
-                      </>
-                    ) : isRequested ? (
-                      <>
-                        <span className="follow-icon">⏳</span>
-                        Requested
-                      </>
-                    ) : (
-                      <>
-                        <span className="follow-icon">+</span>
-                        Follow
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {isOwnProfile && (
-              <div className="profile-right">
-                <div className="profile-menu" ref={profileMenuRef}>
-                  <button
-                    className="profile-menu-btn"
-                    onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  >
-                    ⋯
-                  </button>
-                  {showProfileMenu && (
-                    <div className="profile-menu-dropdown">
-                      <button
-                        className="menu-item"
-                        onClick={() => {
-                          setShowEditModal(true);
-                          setShowProfileMenu(false);
-                        }}
-                      >
-                        <span className="menu-icon">✏️</span>
-                        Edit Profile
-                      </button>
-                      <button
-                        className="menu-item"
-                        onClick={() => {
-                          logout();
-                          navigate('/');
-                        }}
-                      >
-                        <span className="menu-icon">🚪</span>
-                        Logout
-                      </button>
-                      <button
-                        className="menu-item delete-btn"
-                        onClick={() => {
-                          setShowDeleteModal(true);
-                          setShowProfileMenu(false);
-                        }}
-                      >
-                        <span className="menu-icon">🗑️</span>
-                        Delete Account
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+    <div className="wren-profile-view">
+      <ProfileHeader
+        user={profileUser}
+        isOwnProfile={isOwnProfile}
+        onBioUpdate={(newBio) => setProfileUser(prev => prev ? { ...prev, bio: newBio } : null)}
+        onFollowToggle={handleFollowToggle}
+        postCount={postCount}
+        followersCount={followerCount}
+        followingCount={followingCount}
+        isFollowing={isFollowing}
+      />
 
         {/* Profile Content */}
         <div className="profile-content">
@@ -528,19 +368,11 @@ const Profile: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="empty-posts">
-                  <div className="empty-icon">📱</div>
-                  <h3>No posts yet</h3>
-                  <p>
-                    {isOwnProfile 
-                      ? "You haven't shared any posts yet. Create your first post to get started!"
-                      : `${profileUser.username} hasn't shared any posts yet.`
-                    }
-                  </p>
+                <div className="wren-empty-state">
+                  <h3 className="wren-empty-title">This is where their posts will show up.</h3>
                   {isOwnProfile && (
-                    <Link to="/create-post" className="btn btn-primary">
-                      <span className="btn-icon">✨</span>
-                      Create Your First Post
+                    <Link to="/create-post" className="wren-empty-link">
+                      Write your first letter.
                     </Link>
                   )}
                 </div>
@@ -548,7 +380,6 @@ const Profile: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
 
       {/* Edit Profile Modal */}
       {showEditModal && (

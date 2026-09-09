@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/ui';
 import type { LoginCredentials } from '../types';
 
 const Login: React.FC = () => {
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: '',
-    password: ''
+    password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,8 +27,9 @@ const Login: React.FC = () => {
     try {
       await login(credentials);
       navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Login failed. Please check your credentials.';
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -37,144 +39,120 @@ const Login: React.FC = () => {
     const { name, value } = e.target;
     setCredentials(prev => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   return (
-    <div className="auth-page-epic">
-      <div className="auth-background">
-        <div className="auth-background-shapes">
-          <div className="shape shape-1"></div>
-          <div className="shape shape-2"></div>
-          <div className="shape shape-3"></div>
-          <div className="shape shape-4"></div>
-        </div>
-      </div>
-      
-      <div className="auth-container-epic">
-        <div className="auth-card">
-          <div className="auth-header">
-            <div className="auth-logo">
-              <div className="logo-icon">🐦</div>
-              <h1 className="logo-text">UdtaBirdie</h1>
-            </div>
-            <h2 className="auth-title">Welcome Back</h2>
-            <p className="auth-subtitle">Sign in to continue your journey</p>
-          </div>
-
-          {error && (
-            <div className="error-message-epic">
-              <span className="error-icon">⚠️</span>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="auth-form-epic">
-            <div className="form-group-epic">
-              <div className="input-wrapper">
-                <span className="input-icon">📧</span>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={credentials.email}
-                  onChange={handleChange}
-                  required
-                  disabled={isLoading}
-                  className="form-input-epic"
-                />
-                <label htmlFor="email" className={`floating-label ${credentials.email ? 'active' : ''}`}>Email Address</label>
-              </div>
-            </div>
-
-            <div className="form-group-epic">
-              <div className="input-wrapper">
-                <span className="input-icon">🔒</span>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="password"
-                  name="password"
-                  value={credentials.password}
-                  onChange={handleChange}
-                  required
-                  disabled={isLoading}
-                  className="form-input-epic"
-                />
-                <label htmlFor="password" className={`floating-label ${credentials.password ? 'active' : ''}`}>Password</label>
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="btn-epic btn-primary-epic"
+    <div style={{ maxWidth: '440px', margin: '40px auto 0' }}>
+      <div className="wren-card">
+        <div style={{ marginBottom: '28px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <img
+              src="/logo2.png"
+              alt="UdtaBirdie"
+              style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '4px' }}
+            />
+            <span
+              className="type-ui-s"
+              style={{ letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--ink-600)', fontWeight: 600 }}
             >
-              {isLoading ? (
-                <>
-                  <span className="loading-spinner"></span>
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  <span className="btn-icon">🚀</span>
-                  Sign In
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="auth-divider">
-            <span>or</span>
+              UdtaBirdie
+            </span>
           </div>
-
-          <div className="social-login">
-            <button className="social-btn google-btn" disabled>
-              <span className="social-icon">🔍</span>
-              Continue with Google
-            </button>
-            <button className="social-btn github-btn" disabled>
-              <span className="social-icon">⚫</span>
-              Continue with GitHub
-            </button>
-          </div>
-
-          <div className="auth-footer-epic">
-            <p>
-              Don't have an account?{' '}
-              <Link to="/register" className="auth-link-epic">
-                Create one now
-              </Link>
-            </p>
-          </div>
+          <h1 className="type-display-m" style={{ marginBottom: '6px' }}>
+            Sign In
+          </h1>
+          <p className="type-ui-m">Enter your correspondence credentials to continue</p>
         </div>
 
-        <div className="auth-side-panel">
-          <div className="side-content">
-            <h3>Join the Community</h3>
-            <p>Connect with friends, share moments, and discover amazing content from people around the world.</p>
-            <div className="features-list">
-              <div className="feature-item">
-                <span className="feature-icon">✨</span>
-                <span>Share your moments</span>
-              </div>
-              <div className="feature-item">
-                <span className="feature-icon">🌍</span>
-                <span>Connect globally</span>
-              </div>
-              <div className="feature-item">
-                <span className="feature-icon">🔒</span>
-                <span>Privacy focused</span>
-              </div>
+        {error && (
+          <div className="wren-error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="wren-form-group">
+            <label htmlFor="email" className="wren-label">
+              Email Address
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={credentials.email}
+              onChange={handleChange}
+              required
+              disabled={isLoading}
+              className="wren-input"
+              autoComplete="email"
+            />
+          </div>
+
+          <div className="wren-form-group">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="password" className="wren-label">
+                Password
+              </label>
+              <Link to="/forgot-password" className="type-ui-s" style={{ color: 'var(--wine-700)' }}>
+                Forgot?
+              </Link>
+            </div>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                name="password"
+                value={credentials.password}
+                onChange={handleChange}
+                required
+                disabled={isLoading}
+                className="wren-input"
+                style={{ width: '100%', paddingRight: '40px' }}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--ink-600)',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                }}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
             </div>
           </div>
+
+          <div style={{ marginTop: '24px' }}>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={isLoading}
+              isLoading={isLoading}
+              style={{ width: '100%' }}
+            >
+              Sign In
+            </Button>
+          </div>
+        </form>
+
+        <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
+          <p className="type-ui-m">
+            Don't have an account?{' '}
+            <Link to="/register" style={{ color: 'var(--wine-700)', fontWeight: 500 }}>
+              Create one here
+            </Link>
+          </p>
         </div>
       </div>
     </div>

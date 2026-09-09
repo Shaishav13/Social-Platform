@@ -7,6 +7,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // This allows access from any IP address
     port: 3001,
+    watch: {
+      usePolling: true,
+      interval: 1000,
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3003',

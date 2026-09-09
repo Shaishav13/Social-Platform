@@ -6,6 +6,7 @@ import CommentSection from './CommentSection';
 import ShareButton from './ShareButton';
 import api from '../../services/api';
 import { resolveMediaUrl, handleMediaError, getMediaAltText } from '../../utils/media';
+import { MediaViewerModal } from '../ui/MediaViewerModal';
 
 interface PostCardProps {
   post: Post;
@@ -20,7 +21,7 @@ interface PostCardProps {
 const PostCard: React.FC<PostCardProps> = ({ 
   post, 
   currentUser, 
-  isDetailView = false,
+  isDetailView: _isDetailView = false,
   onUpdate,
   onDelete,
   onPostUpdate, 
@@ -33,6 +34,8 @@ const PostCard: React.FC<PostCardProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content || '');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
@@ -66,7 +69,7 @@ const PostCard: React.FC<PostCardProps> = ({
 
     setIsUpdating(true);
     try {
-      const response = await api.put(`/content/posts/${localPost.id}`, {
+      await api.put(`/content/posts/${localPost.id}`, {
         content: editContent.trim()
       });
 
@@ -75,8 +78,8 @@ const PostCard: React.FC<PostCardProps> = ({
       setIsEditing(false);
       setShowMenu(false);
       
-      if (onUpdate || onPostUpdate) {
-        const updateCallback = onUpdate || onPostUpdate;
+      const updateCallback = onUpdate || onPostUpdate;
+      if (updateCallback) {
         updateCallback(updatedPost);
       }
     } catch (error) {
@@ -245,7 +248,16 @@ const PostCard: React.FC<PostCardProps> = ({
           <div className={`post-media ${localPost.mediaUrls.length > 1 ? 'multiple' : 'single'}`}>
             {localPost.mediaType === 'image' ? (
               localPost.mediaUrls.map((url, index) => (
-                <div key={index} className="media-item">
+                <div
+                  key={index}
+                  className="media-item"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => {
+                    setViewerIndex(index);
+                    setViewerOpen(true);
+                  }}
+                  title="Click to view full size"
+                >
                   <img 
                     src={resolveMediaUrl(url)} 
                     alt={getMediaAltText(index, 'image')}
@@ -256,7 +268,16 @@ const PostCard: React.FC<PostCardProps> = ({
               ))
             ) : localPost.mediaType === 'video' ? (
               localPost.mediaUrls.map((url, index) => (
-                <div key={index} className="media-item">
+                <div
+                  key={index}
+                  className="media-item"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => {
+                    setViewerIndex(index);
+                    setViewerOpen(true);
+                  }}
+                  title="Click to view full size"
+                >
                   <video 
                     src={resolveMediaUrl(url)} 
                     controls
@@ -345,6 +366,17 @@ const PostCard: React.FC<PostCardProps> = ({
           }}
         />
       )}
+
+      {/* Full-size Photo/Video Viewer Modal with Slider Navigation */}
+      <MediaViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        mediaUrls={localPost.mediaUrls || []}
+        initialIndex={viewerIndex}
+        authorName={localPost.author?.username}
+        authorUsername={localPost.author?.username}
+        caption={localPost.content}
+      />
     </article>
   );
 };

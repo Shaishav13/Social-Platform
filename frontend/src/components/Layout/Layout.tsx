@@ -1,19 +1,19 @@
-import React from 'react';
-import Header from './Header';
+import { useLocation } from 'react-router-dom';
+import { AppLayout } from './AppLayout';
+import { AdminLayout } from './AdminLayout';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  return (
-    <div className="app-layout">
-      <Header />
-      <main className="main-content">
-        {children}
-      </main>
-    </div>
-  );
+  const location = useLocation();
+
+  if (location.pathname.startsWith('/admin')) {
+    return <AdminLayout>{children}</AdminLayout>;
+  }
+
+  return <AppLayout>{children}</AppLayout>;
 };
 
 export default Layout;

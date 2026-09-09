@@ -6,12 +6,81 @@ export interface User {
   profilePicture?: string;
   bio?: string;
   isPrivate: boolean;
+  role?: 'admin' | 'moderator' | 'user';
+  isRestricted?: boolean;
   followerCount?: number;
   followingCount?: number;
   postCount?: number;
   isFollowing?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// Admin Management types
+export interface AdminStats {
+  users: {
+    total: number;
+    active: number;
+    restricted: number;
+    admins: number;
+  };
+  content: {
+    posts: number;
+    comments: number;
+  };
+  moderation: {
+    totalReports: number;
+    pendingReports: number;
+  };
+  system: {
+    uptimeSeconds: number;
+    nodeVersion: string;
+    memoryUsageMb: number;
+  };
+}
+
+export interface AdminUserRecord {
+  id: string;
+  username: string;
+  email: string;
+  profilePicture?: string;
+  bio?: string;
+  isPrivate: boolean;
+  role: 'admin' | 'moderator' | 'user';
+  isRestricted: boolean;
+  postCount?: number;
+  followerCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlatformFeatures {
+  publicRegistration: boolean;
+  mediaUploads: boolean;
+  commenting: boolean;
+  followRequests: boolean;
+  maintenanceMode: boolean;
+  trendingFeed: boolean;
+}
+
+export interface PlatformSettings {
+  siteName: string;
+  announcementBanner: string;
+  defaultDensity: 'comfortable' | 'compact';
+  maxPostLength: number;
+  rateLimitMaxRequests: number;
+}
+
+export interface ModerationReport {
+  id: string;
+  reporter_id: string;
+  target_id: string;
+  target_type: 'post' | 'comment';
+  reason: string;
+  status: 'pending' | 'resolved';
+  created_at: string;
+  reporter_username?: string;
+  target_content?: string;
 }
 
 // Auth types

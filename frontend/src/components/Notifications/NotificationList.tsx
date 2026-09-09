@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import type { Notification } from '../../types';
+import { SkeletonLoader } from '../wren';
 import api from '../../services/api';
 
 const NotificationList: React.FC = () => {
@@ -182,11 +183,7 @@ const NotificationList: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="notifications-container">
-        <div className="notifications-loading">Loading notifications...</div>
-      </div>
-    );
+    return <SkeletonLoader count={3} />;
   }
 
   return (

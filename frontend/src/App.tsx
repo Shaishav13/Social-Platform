@@ -17,6 +17,8 @@ import PublicRoute from './components/PublicRoute';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Feed from './pages/Feed';
 import Profile from './pages/Profile';
 import EditProfile from './pages/EditProfile';
@@ -27,7 +29,16 @@ import FollowRequests from './pages/FollowRequests';
 import TestFollowRequests from './pages/TestFollowRequests';
 import Search from './pages/Search';
 import Explore from './pages/Explore';
-import './App.css';
+import Settings from './pages/Settings';
+import AdminRoute from './routes/AdminRoute';
+import {
+  AdminDashboard,
+  AdminUsers,
+  AdminFeatures,
+  AdminSettings,
+  AdminModeration,
+} from './pages/admin';
+import './styles/wren.css';
 
 function App() {
   return (
@@ -47,6 +58,16 @@ function App() {
                 <Register />
               </PublicRoute>
             } />
+            <Route path="/forgot-password" element={
+              <PublicRoute>
+                <ForgotPassword />
+              </PublicRoute>
+            } />
+            <Route path="/reset-password" element={
+              <PublicRoute>
+                <ResetPassword />
+              </PublicRoute>
+            } />
             
             {/* Protected routes */}
             <Route path="/feed" element={
@@ -60,6 +81,11 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="/profile/edit" element={
+              <ProtectedRoute>
+                <EditProfile />
+              </ProtectedRoute>
+            } />
+            <Route path="/edit-profile" element={
               <ProtectedRoute>
                 <EditProfile />
               </ProtectedRoute>
@@ -106,10 +132,42 @@ function App() {
                 <Explore />
               </ProtectedRoute>
             } />
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            } />
             <Route path="/blogs" element={
               <ProtectedRoute>
                 <div>Blogs page - Coming soon</div>
               </ProtectedRoute>
+            } />
+
+            {/* Admin Upper Hierarchy routes */}
+            <Route path="/admin" element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/admin/users" element={
+              <AdminRoute>
+                <AdminUsers />
+              </AdminRoute>
+            } />
+            <Route path="/admin/features" element={
+              <AdminRoute>
+                <AdminFeatures />
+              </AdminRoute>
+            } />
+            <Route path="/admin/settings" element={
+              <AdminRoute>
+                <AdminSettings />
+              </AdminRoute>
+            } />
+            <Route path="/admin/moderation" element={
+              <AdminRoute>
+                <AdminModeration />
+              </AdminRoute>
             } />
             
             {/* Catch all route */}

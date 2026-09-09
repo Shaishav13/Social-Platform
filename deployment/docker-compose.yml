@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Main application
   app:
-    build: .
+    build: ../backend
     ports:
       - "3000:3000"
     environment:
@@ -14,7 +14,7 @@ services:
       - postgres
       - redis
     volumes:
-      - ./uploads:/app/uploads
+      - ../backend/uploads:/app/uploads
       - ./logs:/app/logs
     restart: unless-stopped
     networks:
@@ -35,7 +35,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ../backend/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     ports:
       - "5432:5432"
     restart: unless-stopped

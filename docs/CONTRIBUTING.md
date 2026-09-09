@@ -32,17 +32,17 @@ git clone https://github.com/Shaishav13/social-platform.git
 cd social-platform
 
 # Install dependencies
-npm install
+cd backend && npm install && cd ..
 cd frontend && npm install && cd ..
 
 # Set up environment
-cp .env.example .env
+cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 
-# Start development servers
-npm run dev
+# Start development servers from root
+npm run dev:backend
 # In another terminal:
-cd frontend && npm run dev
+npm run dev:frontend
 ```
 
 #### Code Style
@@ -57,8 +57,8 @@ cd frontend && npm run dev
 - Ensure all existing tests pass
 - Run the test suite before submitting:
 ```bash
-npm test
-cd frontend && npm test
+npm run test:backend
+npm run test:frontend
 ```
 
 #### Pull Request Process
@@ -103,14 +103,16 @@ Understanding the project structure will help you contribute effectively:
 
 ```
 social-platform/
-├── frontend/           # React frontend
-├── src/               # Backend source
-│   ├── services/      # Microservices
-│   ├── middleware/    # Express middleware
-│   ├── config/        # Configuration
-│   └── utils/         # Utilities
-├── scripts/           # Database scripts
-└── uploads/           # File storage
+├── backend/            # Express TypeScript microservices backend
+│   ├── src/            # Backend services, gateway, middleware
+│   ├── config/         # Environment & tooling configurations
+│   ├── scripts/        # Database migrations & seeds
+│   └── uploads/        # Uploaded media assets
+├── frontend/           # React 19 + TypeScript frontend
+│   ├── src/            # Components, pages, contexts, styles
+│   └── public/         # Static client assets
+├── deployment/         # Docker Compose, Nginx, deployment specs
+└── docs/               # Architecture & developer documentation
 ```
 
 ## 🎯 Areas for Contribution

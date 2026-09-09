@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { User, Post } from '../types';
 import SearchBar from '../components/Search/SearchBar';
-import PostCard from '../components/Social/PostCard';
+import { PostCard, SkeletonLoader } from '../components/wren';
 import api from '../services/api';
 
 const Explore: React.FC = () => {
@@ -42,7 +42,7 @@ const Explore: React.FC = () => {
       const allPosts = feedResponse.data.posts || [];
       
       // Sort posts by engagement (likes + comments) to get truly trending posts
-      const sortedTrendingPosts = allPosts.sort((a, b) => {
+      const sortedTrendingPosts = allPosts.sort((a: Post, b: Post) => {
         const aEngagement = (a.likeCount || 0) + (a.commentCount || 0);
         const bEngagement = (b.likeCount || 0) + (b.commentCount || 0);
         return bEngagement - aEngagement;
@@ -54,7 +54,7 @@ const Explore: React.FC = () => {
       // For suggested users, we'll get recent users from the feed posts
       try {
         // Extract unique authors from all posts and get their profile info
-        const authorIds = [...new Set(allPosts.map(post => post.authorId))];
+        const authorIds = [...new Set(allPosts.map((post: Post) => post.authorId))];
         const userPromises = authorIds.slice(0, 10).map(async (authorId) => {
           try {
             const userResponse = await api.get(`/profile/users/${authorId}`);
@@ -66,7 +66,7 @@ const Explore: React.FC = () => {
         
         const users = (await Promise.all(userPromises)).filter(user => user !== null);
         setSuggestedUsers(users);
-      } catch (userError) {
+      } catch {
         console.log('No suggested users available');
         setSuggestedUsers([]);
       }
@@ -88,13 +88,12 @@ const Explore: React.FC = () => {
       const allPosts = feedResponse.data.posts || [];
       
       // Filter posts that match the search query
-      const matchingPosts = allPosts.filter(post => 
-        post.content?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        post.title?.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchingPosts = allPosts.filter((post: Post) => 
+        post.content?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       
       // Get all unique author IDs from matching posts
-      const authorIds = [...new Set(matchingPosts.map(post => post.authorId))];
+      const authorIds = [...new Set(matchingPosts.map((post: Post) => post.authorId))];
       
       // Get user profiles for authors and also search by username
       const userPromises = authorIds.slice(0, 20).map(async (authorId) => {
@@ -158,15 +157,7 @@ const Explore: React.FC = () => {
   const hasSearchResults = searchResults.users.length > 0 || searchResults.posts.length > 0;
 
   if (isLoading) {
-    return (
-      <div className="explore-page">
-        <div className="explore-container">
-          <div className="loading-state">
-            <div className="loading-spinner">Loading explore...</div>
-          </div>
-        </div>
-      </div>
-    );
+    return <SkeletonLoader count={3} />;
   }
 
   return (

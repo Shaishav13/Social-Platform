@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { Post } from '../types';
-import PostCard from '../components/Social/PostCard';
+import { PostCard, ComposeLetter, SkeletonLoader } from '../components/wren';
 import api from '../services/api';
 
 const Feed: React.FC = () => {
@@ -12,7 +12,7 @@ const Feed: React.FC = () => {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  
+
   const { user } = useAuth();
 
   useEffect(() => {
@@ -26,19 +26,19 @@ const Feed: React.FC = () => {
 
       const response = await api.get(`/content/feed?page=${pageNum}&limit=10`);
       const newPosts = response.data.posts || [];
-      
+
       if (append) {
         setPosts(prev => [...prev, ...newPosts]);
       } else {
         setPosts(newPosts);
       }
-      
+
       setHasMore(newPosts.length === 10);
       setPage(pageNum);
       setError('');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load feed:', err);
-      setError('Failed to load feed. Please try again.');
+      setError('Your letters couldn’t be loaded. Check your connection and try again.');
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -46,10 +46,8 @@ const Feed: React.FC = () => {
   };
 
   const handlePostUpdate = (updatedPost: Post) => {
-    setPosts(prev => 
-      prev.map(post => 
-        post.id === updatedPost.id ? updatedPost : post
-      )
+    setPosts(prev =>
+      prev.map(post => (post.id === updatedPost.id ? updatedPost : post))
     );
   };
 
@@ -63,70 +61,67 @@ const Feed: React.FC = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="feed-container">
-        <div className="loading-spinner">
-          <div>Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="feed-container">
-      {/* Feed Content */}
+    <div className="wren-feed-view">
+      {/* Editorial Composer at head of feed */}
+      <ComposeLetter onPostCreated={() => loadFeed(1, false)} />
+
+      {/* Error alert in active plain language */}
       {error && (
-        <div className="error-message">
-          <p>{error}</p>
-          <button 
-            onClick={() => loadFeed()}
-            className="btn btn-primary btn-sm"
+        <div className="wren-error" role="alert">
+          <span>{error}</span>
+          <button
+            onClick={() => loadFeed(1, false)}
+            style={{
+              marginLeft: '12px',
+              background: 'none',
+              border: 'none',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+              color: 'inherit',
+              fontWeight: 600,
+            }}
           >
-            Try Again
+            Retry
           </button>
         </div>
       )}
 
-      {posts.length > 0 ? (
-        <>
-          <div className="posts-list">
-            {posts.map(post => (
-              <PostCard 
-                key={post.id}
-                post={post}
-                currentUser={user || undefined}
-                onPostUpdate={handlePostUpdate}
-                onPostDelete={handlePostDelete}
-              />
-            ))}
-          </div>
+      {/* Loading state: skeleton matching real serif line-height and varying line widths */}
+      {isLoading ? (
+        <SkeletonLoader count={3} />
+      ) : posts.length > 0 ? (
+        <div className="wren-posts-flow">
+          {posts.map(post => (
+            <PostCard
+              key={post.id}
+              post={post}
+              currentUser={user || undefined}
+              onPostUpdate={handlePostUpdate}
+              onPostDelete={handlePostDelete}
+            />
+          ))}
 
           {hasMore && (
-            <div className="load-more-section">
-              <button 
+            <div style={{ padding: '24px 0', textAlign: 'center' }}>
+              <button
                 onClick={loadMore}
                 disabled={isLoadingMore}
-                className="btn btn-ghost"
+                className="wren-btn wren-btn-secondary"
+                style={{ width: '100%' }}
               >
-                {isLoadingMore ? 'Loading...' : 'Load more posts'}
+                {isLoadingMore ? 'Loading...' : 'Read more entries'}
               </button>
             </div>
           )}
-        </>
+        </div>
       ) : (
-        <div className="empty-state">
-          <div className="empty-state-icon">📷</div>
-          <h3>No posts yet</h3>
-          <p>When you follow people, you'll see their posts here.</p>
-          <div className="empty-feed-actions">
-            <Link to="/explore" className="btn btn-primary">
-              Find people to follow
-            </Link>
-            <Link to="/create-post" className="btn btn-secondary">
-              Create your first post
-            </Link>
-          </div>
+        /* Empty Feed state per Blueprint §3.1 */
+        <div className="wren-empty-state">
+          <h2 className="wren-empty-title">Nothing new since your last visit.</h2>
+          <Link to="/explore" className="wren-empty-link">
+            Find people to follow.
+          </Link>
         </div>
       )}
     </div>
