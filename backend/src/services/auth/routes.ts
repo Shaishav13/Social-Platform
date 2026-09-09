@@ -190,7 +190,7 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully. A 6-digit verification code has been dispatched to your email.',
+      message: 'User registered successfully. A 6-digit verification code has been dispatched to your email. (Please check your Spam/Junk folder if not in Inbox).',
       requiresVerification: true,
       data: {
         email: user.email,
@@ -392,7 +392,7 @@ router.post('/resend-verification-otp', resendOtpLimiter, async (req: Request, r
 
     res.status(200).json({
       success: true,
-      message: 'A new verification code has been dispatched to your email address.',
+      message: 'A new verification code has been dispatched to your email address. (Please check your Spam/Junk folder if not in Inbox).',
     });
 
   } catch (error: any) {

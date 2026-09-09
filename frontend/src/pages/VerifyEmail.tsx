@@ -163,7 +163,7 @@ const VerifyEmail: React.FC = () => {
 
     try {
       const msg = await resendVerificationOtp(email.trim().toLowerCase());
-      setInfoMessage(msg || 'A fresh verification code has been dispatched to your email.');
+      setInfoMessage((msg || 'A fresh verification code has been dispatched to your email.') + ' Please also check your Spam or Junk folder.');
       setResendCooldown(60);
       setOtpDigits(['', '', '', '', '', '']);
       if (inputRefs.current[0]) inputRefs.current[0]?.focus();
@@ -207,6 +207,37 @@ const VerifyEmail: React.FC = () => {
               'Enter the email address you registered with and your 6-digit code.'
             )}
           </p>
+        </div>
+
+        {/* Spam / Junk Folder Tip Banner */}
+        <div
+          style={{
+            backgroundColor: 'rgba(169, 117, 46, 0.09)',
+            border: '1px solid rgba(169, 117, 46, 0.35)',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px',
+            textAlign: 'left',
+          }}
+        >
+          <span style={{ fontSize: '20px', lineHeight: 1, marginTop: '1px' }}>📬</span>
+          <div style={{ flex: 1 }}>
+            <p
+              className="type-ui-s"
+              style={{ margin: 0, color: 'var(--ink-800)', fontWeight: 600, lineHeight: 1.4 }}
+            >
+              Can't find the email in your inbox?
+            </p>
+            <p
+              className="type-ui-s"
+              style={{ margin: '4px 0 0', color: 'var(--ink-600)', lineHeight: 1.45 }}
+            >
+              Please check your <strong>Spam</strong>, <strong>Junk</strong>, or <strong>Promotions</strong> folder. If found there, mark it as <em>"Not Spam"</em> so you don't miss important account notices.
+            </p>
+          </div>
         </div>
 
         {/* Success Alert */}
@@ -330,9 +361,14 @@ const VerifyEmail: React.FC = () => {
                 />
               ))}
             </div>
-            <p className="type-ui-s" style={{ color: 'var(--ink-600)', marginTop: '8px', textAlign: 'center' }}>
-              Tip: You can paste the full 6-digit code into the first box.
-            </p>
+            <div style={{ marginTop: '8px', textAlign: 'center' }}>
+              <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: '0 0 4px 0' }}>
+                Tip: You can paste the full 6-digit code into the first box.
+              </p>
+              <p className="type-ui-s" style={{ color: 'var(--ink-500)', fontSize: '12px', margin: 0 }}>
+                Didn't see it? Check your <strong>Spam / Junk</strong> folder.
+              </p>
+            </div>
           </div>
 
           {/* Submit Button */}
