@@ -31,26 +31,24 @@ export class EmailService {
         const cleanUser = user.trim();
         const cleanPass = pass.replace(/["']/g, '').trim();
 
-        const transportConfig: any = host === 'smtp.gmail.com'
-          ? {
-              service: 'gmail',
-              auth: { user: cleanUser, pass: cleanPass },
-              connectionTimeout: 4000,
-              greetingTimeout: 4000,
-              socketTimeout: 4000,
-            }
-          : {
-              host,
-              port,
-              secure,
-              auth: { user: cleanUser, pass: cleanPass },
-              connectionTimeout: 4000,
-              greetingTimeout: 4000,
-              socketTimeout: 4000,
-              tls: {
-                rejectUnauthorized: false,
-              },
-            };
+        // IMPORTANT: Do NOT use `service: 'gmail'` — it auto-picks port 465 (SSL)
+        // and ignores dns.setDefaultResultOrder, causing ENETUNREACH on IPv6-only paths.
+        // Use explicit host + port 587 (STARTTLS) + family:4 (force IPv4) instead.
+        const isGmail = host === 'smtp.gmail.com';
+        const transportConfig: any = {
+          host: isGmail ? 'smtp.gmail.com' : host,
+          port: isGmail ? 587 : port,
+          secure: false,           // false = STARTTLS on port 587 (not SSL on 465)
+          family: 4,               // Force IPv4 — prevents ENETUNREACH on Render's IPv6 paths
+          auth: { user: cleanUser, pass: cleanPass },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 10000,
+          tls: {
+            rejectUnauthorized: false,
+            minVersion: 'TLSv1.2',
+          },
+        };
 
         this.transporter = nodemailer.createTransport(transportConfig);
         console.log(`[EMAIL] SMTP transporter initialized with host/service: ${host}:${port} for ${cleanUser}`);
