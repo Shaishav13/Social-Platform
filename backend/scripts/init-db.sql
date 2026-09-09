@@ -14,9 +14,30 @@ CREATE TABLE IF NOT EXISTS users (
     profile_picture VARCHAR(500),
     bio TEXT,
     is_private BOOLEAN DEFAULT FALSE,
+    role VARCHAR(20) DEFAULT 'user',
+    is_restricted BOOLEAN DEFAULT FALSE,
+    is_verified BOOLEAN DEFAULT FALSE,
+    email_verified_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Email verifications table (for signup OTP)
+CREATE TABLE IF NOT EXISTS email_verifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email VARCHAR(255) NOT NULL,
+    otp_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    max_attempts INT NOT NULL DEFAULT 5,
+    last_sent_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_verif_user_id ON email_verifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_verif_email ON email_verifications(email);
+CREATE INDEX IF NOT EXISTS idx_email_verif_expires ON email_verifications(expires_at);
 
 -- Posts table
 CREATE TABLE IF NOT EXISTS posts (
@@ -72,6 +93,18 @@ CREATE TABLE IF NOT EXISTS follows (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(follower_id, following_id),
     CHECK (follower_id != following_id)
+);
+
+-- Follow requests table (for private accounts)
+CREATE TABLE IF NOT EXISTS follow_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    requester_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(requester_id, target_id),
+    CHECK (requester_id != target_id)
 );
 
 -- Blogs table
@@ -201,6 +234,9 @@ CREATE INDEX IF NOT EXISTS idx_post_media_post_id ON post_media(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_media_media_id ON post_media(media_id);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_refresh_token ON user_sessions(refresh_token);
+CREATE INDEX IF NOT EXISTS idx_follow_requests_requester ON follow_requests(requester_id);
+CREATE INDEX IF NOT EXISTS idx_follow_requests_target ON follow_requests(target_id);
+CREATE INDEX IF NOT EXISTS idx_follow_requests_status ON follow_requests(status);
 
 -- Create full-text search indexes
 CREATE INDEX IF NOT EXISTS idx_posts_content_search ON posts USING gin(to_tsvector('english', content));
@@ -223,6 +259,7 @@ CREATE TRIGGER update_blog_posts_updated_at BEFORE UPDATE ON blog_posts FOR EACH
 CREATE TRIGGER update_reports_updated_at BEFORE UPDATE ON reports FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_content_flags_updated_at BEFORE UPDATE ON content_flags FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_sessions_updated_at BEFORE UPDATE ON user_sessions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_follow_requests_updated_at BEFORE UPDATE ON follow_requests FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Insert some sample data for testing (optional)
 -- You can uncomment these lines if you want some initial test data
