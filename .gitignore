@@ -78,7 +78,8 @@ build
 
 # Gatsby files
 .cache/
-public
+# public is needed by Vite frontend for static assets!
+!frontend/public/**
 
 # Storybook build outputs
 .out
