@@ -18,16 +18,26 @@ export class EmailService {
 
     if (host && user && pass) {
       try {
-        this.transporter = nodemailer.createTransport({
-          host,
-          port,
-          secure,
-          auth: { user, pass },
-          tls: {
-            rejectUnauthorized: process.env.NODE_ENV === 'production',
-          },
-        });
-        console.log(`[EMAIL] SMTP transporter initialized with host: ${host}:${port}`);
+        const cleanUser = user.trim();
+        const cleanPass = pass.replace(/["']/g, '').trim();
+
+        const transportConfig: any = host === 'smtp.gmail.com'
+          ? {
+              service: 'gmail',
+              auth: { user: cleanUser, pass: cleanPass },
+            }
+          : {
+              host,
+              port,
+              secure,
+              auth: { user: cleanUser, pass: cleanPass },
+              tls: {
+                rejectUnauthorized: false,
+              },
+            };
+
+        this.transporter = nodemailer.createTransport(transportConfig);
+        console.log(`[EMAIL] SMTP transporter initialized with host/service: ${host}:${port} for ${cleanUser}`);
       } catch (err) {
         console.error('[EMAIL] Failed to initialize SMTP transporter:', err);
         this.transporter = null;
@@ -41,7 +51,8 @@ export class EmailService {
   }
 
   private static getSenderAddress(): string {
-    return process.env.EMAIL_FROM || '"UdtaBirdie" <noreply@udtabirdie.com>';
+    const defaultSender = process.env.SMTP_USER ? `"UdtaBirdie" <${process.env.SMTP_USER.trim()}>` : '"UdtaBirdie" <noreply@udtabirdie.com>';
+    return process.env.EMAIL_FROM || defaultSender;
   }
 
   /**

@@ -102,6 +102,21 @@ function sanitizeInput(input: string): string {
   return input.trim().replace(/[<>]/g, '');
 }
 
+// GET /auth/smtp-status (safe diagnostic endpoint)
+router.get('/smtp-status', (_req: Request, res: Response) => {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  res.json({
+    configured: !!(host && user && pass),
+    host: host || 'not configured',
+    port: process.env.SMTP_PORT || '587',
+    userConfigured: !!user,
+    userMasked: user ? `${user.substring(0, 3)}***@${user.split('@')[1] || ''}` : 'none',
+    passwordConfigured: !!pass,
+  });
+});
+
 // POST /auth/register
 router.post('/register', registerLimiter, async (req: Request, res: Response) => {
   try {
