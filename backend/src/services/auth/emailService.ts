@@ -1,44 +1,18 @@
+import dns from 'dns';
 import nodemailer, { Transporter } from 'nodemailer';
 
-export interface EmailDispatchResult {
-  success: boolean;
-  provider: 'resend' | 'brevo' | 'smtp' | 'console' | 'none';
-  messageId?: string;
-  error?: string;
-  details?: any;
+// Force Node.js DNS to resolve IPv4 addresses first.
+// Prevents ENETUNREACH network unreachable errors on cloud hosting (Render/Docker)
+// where outbound IPv6 routes are unavailable.
+try {
+  dns.setDefaultResultOrder?.('ipv4first');
+} catch (_) {
+  // Ignore in environments where setDefaultResultOrder is not available
 }
 
 export class EmailService {
   private static transporter: Transporter | null = null;
   private static initialized = false;
-  public static lastDispatchResult: EmailDispatchResult | null = null;
-
-  static getResendApiKey(): string | null {
-    const raw = process.env.RESEND_API_KEY ||
-      process.env.RESEND_KEY ||
-      process.env.RESEND_API ||
-      process.env.RESEND ||
-      process.env.VITE_RESEND_API_KEY;
-    if (!raw) return null;
-    return raw.replace(/["']/g, '').trim();
-  }
-
-  static getBrevoApiKey(): string | null {
-    const raw = process.env.BREVO_API_KEY ||
-      process.env.BREVO_KEY ||
-      process.env.SENDINBLUE_API_KEY;
-    if (!raw) return null;
-    return raw.replace(/["']/g, '').trim();
-  }
-
-  static getResendFrom(): string {
-    const custom = process.env.RESEND_FROM?.replace(/["']/g, '').trim();
-    if (custom && !custom.includes('@gmail.com') && !custom.includes('@yahoo.com') && !custom.includes('@hotmail.com')) {
-      return custom;
-    }
-    // Resend free tier strictly requires onboarding@resend.dev unless a custom domain is verified
-    return 'UdtaBirdie <onboarding@resend.dev>';
-  }
 
   private static getTransporter(): Transporter | null {
     if (this.initialized) {
@@ -61,18 +35,12 @@ export class EmailService {
           ? {
               service: 'gmail',
               auth: { user: cleanUser, pass: cleanPass },
-              connectionTimeout: 5000,
-              greetingTimeout: 5000,
-              socketTimeout: 5000,
             }
           : {
               host,
               port,
               secure,
               auth: { user: cleanUser, pass: cleanPass },
-              connectionTimeout: 5000,
-              greetingTimeout: 5000,
-              socketTimeout: 5000,
               tls: {
                 rejectUnauthorized: false,
               },
@@ -98,146 +66,12 @@ export class EmailService {
   }
 
   /**
-   * Unified email dispatcher:
-   * 1. Tries Resend HTTP API (immune to cloud SMTP port blocks on port 443)
-   * 2. Tries Brevo HTTP API (immune to cloud SMTP port blocks on port 443)
-   * 3. Falls back to standard SMTP (subject to cloud firewall restrictions)
-   * 4. Logs to console in local/development mode
-   */
-  static async dispatchEmail(to: string, subject: string, html: string, text: string): Promise<EmailDispatchResult> {
-    const errors: string[] = [];
-
-    // 1. Try Resend HTTP API
-    const resendKey = this.getResendApiKey();
-    if (resendKey) {
-      const from = this.getResendFrom();
-      console.log(`[EMAIL] Attempting Resend API dispatch to ${to} (from: ${from})...`);
-      try {
-        const res = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from,
-            to: [to],
-            subject,
-            html,
-            text,
-          }),
-        });
-        const data: any = await res.json().catch(() => ({}));
-        if (res.ok && data.id) {
-          console.log(`[EMAIL-HTTP] ✅ Resend delivered successfully! Message ID: ${data.id}`);
-          const result: EmailDispatchResult = {
-            success: true,
-            provider: 'resend',
-            messageId: data.id,
-            details: data,
-          };
-          this.lastDispatchResult = result;
-          return result;
-        } else {
-          const errMsg = data.message || `HTTP ${res.status}: ${JSON.stringify(data)}`;
-          console.error(`[EMAIL-HTTP] ❌ Resend returned error:`, errMsg);
-          errors.push(`Resend: ${errMsg}`);
-        }
-      } catch (err: any) {
-        console.error('[EMAIL-HTTP] ❌ Resend request failed:', err.message);
-        errors.push(`Resend network: ${err.message}`);
-      }
-    }
-
-    // 2. Try Brevo HTTP API
-    const brevoKey = this.getBrevoApiKey();
-    if (brevoKey) {
-      const senderEmail = process.env.SMTP_USER?.trim() || 'udtabirdie@gmail.com';
-      console.log(`[EMAIL] Attempting Brevo API dispatch to ${to}...`);
-      try {
-        const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'api-key': brevoKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            sender: { name: 'UdtaBirdie', email: senderEmail },
-            to: [{ email: to }],
-            subject,
-            htmlContent: html,
-            textContent: text,
-          }),
-        });
-        const data: any = await res.json().catch(() => ({}));
-        if (res.ok && data.messageId) {
-          console.log(`[EMAIL-HTTP] ✅ Brevo delivered successfully! Message ID: ${data.messageId}`);
-          const result: EmailDispatchResult = {
-            success: true,
-            provider: 'brevo',
-            messageId: data.messageId,
-            details: data,
-          };
-          this.lastDispatchResult = result;
-          return result;
-        } else {
-          const errMsg = data.message || `HTTP ${res.status}: ${JSON.stringify(data)}`;
-          console.error(`[EMAIL-HTTP] ❌ Brevo returned error:`, errMsg);
-          errors.push(`Brevo: ${errMsg}`);
-        }
-      } catch (err: any) {
-        console.error('[EMAIL-HTTP] ❌ Brevo request failed:', err.message);
-        errors.push(`Brevo network: ${err.message}`);
-      }
-    }
-
-    // 3. Fall back to SMTP transporter
-    const transporter = this.getTransporter();
-    if (transporter) {
-      console.log(`[EMAIL] Attempting SMTP dispatch to ${to}...`);
-      try {
-        const info = await transporter.sendMail({
-          from: this.getSenderAddress(),
-          to,
-          subject,
-          text,
-          html,
-        });
-        console.log(`[EMAIL-SMTP] ✅ SMTP delivered successfully! ID: ${info.messageId}`);
-        const result: EmailDispatchResult = {
-          success: true,
-          provider: 'smtp',
-          messageId: info.messageId,
-        };
-        this.lastDispatchResult = result;
-        return result;
-      } catch (err: any) {
-        console.error(`[EMAIL-SMTP] ❌ SMTP failed:`, err.message);
-        errors.push(`SMTP (${process.env.SMTP_HOST}): ${err.message}`);
-      }
-    }
-
-    // 4. If all fail, log to console in development
-    this.logConsoleOtp(to, 'User', subject, 10);
-    const failureResult: EmailDispatchResult = {
-      success: false,
-      provider: 'console',
-      error: errors.join(' | ') || 'No email delivery provider configured or reachable',
-    };
-    this.lastDispatchResult = failureResult;
-    return failureResult;
-  }
-
-  /**
-   * Send 6-digit email verification OTP to new account
+   * Send 6-digit email verification OTP to new account via SMTP
    */
   static async sendVerificationOtp(email: string, username: string, otp: string): Promise<boolean> {
-    const detailed = await this.sendVerificationOtpDetailed(email, username, otp);
-    return detailed.success;
-  }
-
-  static async sendVerificationOtpDetailed(email: string, username: string, otp: string): Promise<EmailDispatchResult> {
+    const transporter = this.getTransporter();
     const expiryMinutes = 10;
+
     const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
@@ -389,13 +223,34 @@ Security Notice: Never share this code with anyone. UdtaBirdie staff will never 
 If you did not sign up for UdtaBirdie, please ignore this email.
 `;
 
-    return await this.dispatchEmail(email, `${otp} is your UdtaBirdie verification code`, htmlContent, textContent);
+    if (transporter) {
+      try {
+        const info = await transporter.sendMail({
+          from: this.getSenderAddress(),
+          to: email,
+          subject: `${otp} is your UdtaBirdie verification code`,
+          text: textContent,
+          html: htmlContent,
+        });
+        console.log(`[EMAIL] Verification OTP email dispatched to ${email} (MessageID: ${info.messageId})`);
+        return true;
+      } catch (err: any) {
+        console.error(`[EMAIL] Failed to send verification email to ${email}:`, err.message);
+        this.logConsoleOtp(email, username, otp, expiryMinutes);
+        return false;
+      }
+    } else {
+      this.logConsoleOtp(email, username, otp, expiryMinutes);
+      return true;
+    }
   }
 
   /**
-   * Send password recovery email
+   * Send password recovery email via SMTP
    */
   static async sendPasswordResetEmail(email: string, resetUrl: string): Promise<boolean> {
+    const transporter = this.getTransporter();
+
     const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
@@ -427,8 +282,26 @@ ${resetUrl}
 This link is valid for 1 hour. If you did not request this, please ignore this email.
 `;
 
-    const result = await this.dispatchEmail(email, 'Reset your UdtaBirdie password', htmlContent, textContent);
-    return result.success;
+    if (transporter) {
+      try {
+        const info = await transporter.sendMail({
+          from: this.getSenderAddress(),
+          to: email,
+          subject: 'Reset your UdtaBirdie password',
+          text: textContent,
+          html: htmlContent,
+        });
+        console.log(`[EMAIL] Password reset email dispatched to ${email} (MessageID: ${info.messageId})`);
+        return true;
+      } catch (err: any) {
+        console.error(`[EMAIL] Failed to send reset email to ${email}:`, err.message);
+        console.log(`[SECURITY/DEV] Password reset link for ${email}: ${resetUrl}`);
+        return false;
+      }
+    } else {
+      console.log(`[SECURITY/DEV] Password reset link for ${email}: ${resetUrl}`);
+      return true;
+    }
   }
 
   private static logConsoleOtp(email: string, username: string, otp: string, expiryMinutes: number): void {
@@ -436,7 +309,7 @@ This link is valid for 1 hour. If you did not request this, please ignore this e
     console.log(`\n${separator}`);
     console.log('  [EMAIL DISPATCH - DEVELOPMENT / FALLBACK]');
     console.log(`  To: ${username} <${email}>`);
-    console.log(`  Subject: ${otp}`);
+    console.log(`  Subject: ${otp} is your UdtaBirdie verification code`);
     console.log(`  OTP Code: ══▶  [  ${otp}  ]  ◀══ (Expires in ${expiryMinutes} mins)`);
     console.log(`${separator}\n`);
   }

@@ -102,86 +102,34 @@ function sanitizeInput(input: string): string {
   return input.trim().replace(/[<>]/g, '');
 }
 
-// GET /auth/smtp-status (safe diagnostic endpoint)
+// GET /auth/smtp-status (safe diagnostic endpoint for SMTP)
 router.get('/smtp-status', (_req: Request, res: Response) => {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const resendKey = EmailService.getResendApiKey();
-  const brevoKey = EmailService.getBrevoApiKey();
 
   res.json({
-    configured: !!((host && user && pass) || resendKey || brevoKey),
-    activeProvider: resendKey ? 'resend' : brevoKey ? 'brevo' : host ? 'smtp' : 'console',
-    resend: {
-      configured: !!resendKey,
-      keyPrefix: resendKey ? `${resendKey.substring(0, 6)}...` : null,
-      from: EmailService.getResendFrom(),
-    },
-    brevo: {
-      configured: !!brevoKey,
-      keyPrefix: brevoKey ? `${brevoKey.substring(0, 6)}...` : null,
-    },
-    smtp: {
-      configured: !!(host && user && pass),
-      host: host || 'not configured',
-      port: process.env.SMTP_PORT || '587',
-      user: user ? `${user.substring(0, 3)}***@${user.split('@')[1] || ''}` : 'none',
-      passwordConfigured: !!pass,
-    },
-    lastDispatchResult: EmailService.lastDispatchResult,
+    configured: !!(host && user && pass),
+    host: host || 'not configured',
+    port: process.env.SMTP_PORT || '587',
+    userConfigured: !!user,
+    userMasked: user ? `${user.substring(0, 3)}***@${user.split('@')[1] || ''}` : 'none',
+    passwordConfigured: !!pass,
   });
 });
 
-// GET /auth/email-diagnostics
-router.get('/email-diagnostics', (_req: Request, res: Response) => {
-  const resendKey = EmailService.getResendApiKey();
-  const brevoKey = EmailService.getBrevoApiKey();
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  res.json({
-    resend: {
-      configured: !!resendKey,
-      keyPrefix: resendKey ? `${resendKey.substring(0, 6)}...` : null,
-      from: EmailService.getResendFrom(),
-    },
-    brevo: {
-      configured: !!brevoKey,
-      keyPrefix: brevoKey ? `${brevoKey.substring(0, 6)}...` : null,
-    },
-    smtp: {
-      configured: !!(host && user && pass),
-      host: host || 'not configured',
-      port: process.env.SMTP_PORT || '587',
-      user: user ? `${user.substring(0, 3)}***@${user.split('@')[1] || ''}` : 'none',
-      passwordConfigured: !!pass,
-    },
-    lastDispatchResult: EmailService.lastDispatchResult,
-  });
-});
-
-// POST /auth/test-email (Direct test dispatch to verify email provider works)
+// POST /auth/test-email (Direct test dispatch to verify SMTP email delivery)
 router.post('/test-email', async (req: Request, res: Response) => {
   const email = (req.body.email || '').trim().toLowerCase();
   if (!email || !email.includes('@')) {
     return res.status(400).json({ success: false, message: 'Valid email address required in { email }' });
   }
 
-  const result = await EmailService.sendVerificationOtpDetailed(email, 'UdtaBirdie Test', '123456');
-  res.status(result.success ? 200 : 502).json({
-    success: result.success,
-    provider: result.provider,
-    messageId: result.messageId,
-    error: result.error,
-    details: result.details,
-    activeProviderDiagnostics: {
-      resendConfigured: !!EmailService.getResendApiKey(),
-      resendFrom: EmailService.getResendFrom(),
-      brevoConfigured: !!EmailService.getBrevoApiKey(),
-      smtpConfigured: !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
-    },
+  const success = await EmailService.sendVerificationOtp(email, 'UdtaBirdie Test', '123456');
+  res.status(success ? 200 : 500).json({
+    success,
+    message: success ? 'Test email dispatched successfully via SMTP' : 'SMTP dispatch failed. Check server logs.',
+    recipient: email,
   });
 });
 
@@ -269,10 +217,7 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await AuthDatabase.createOrUpdateEmailVerification(user.id, user.email, otpHash, expiresAt);
-    const emailResult = await EmailService.sendVerificationOtpDetailed(user.email, user.username, otp);
-    if (!emailResult.success) {
-      console.error('[AUTH] Email dispatch failed for registered user:', user.email, emailResult.error);
-    }
+    await EmailService.sendVerificationOtp(user.email, user.username, otp);
 
     res.status(201).json({
       success: true,
@@ -474,22 +419,11 @@ router.post('/resend-verification-otp', resendOtpLimiter, async (req: Request, r
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await AuthDatabase.createOrUpdateEmailVerification(user.id, user.email, otpHash, expiresAt);
-    const emailResult = await EmailService.sendVerificationOtpDetailed(user.email, user.username, otp);
-
-    if (!emailResult.success) {
-      console.error('[AUTH] Resend OTP email dispatch failed:', emailResult.error);
-      return res.status(502).json({
-        success: false,
-        message: emailResult.error
-          ? `Email delivery failed: ${emailResult.error}`
-          : 'Failed to deliver verification email. Please check service configuration.',
-      });
-    }
+    await EmailService.sendVerificationOtp(user.email, user.username, otp);
 
     res.status(200).json({
       success: true,
       message: 'A new verification code has been dispatched to your email address. (Please check your Spam/Junk folder if not in Inbox).',
-      provider: emailResult.provider,
     });
 
   } catch (error: any) {
