@@ -76,33 +76,50 @@ export class EmailService {
    * Resend free tier: only allows sending TO the account owner email unless a custom domain is verified.
    * With 'onboarding@resend.dev' as sender, any recipient works in test mode up to 100 emails/day.
    */
-  private static async sendViaResend(to: string, subject: string, html: string, text: string): Promise<boolean> {
-    const apiKey = (process.env.RESEND_API_KEY || process.env.RESEND_KEY || '').replace(/["'\s]/g, '');
+  /**
+   * Send email via Brevo (formerly Sendinblue) HTTP API.
+   * Works on Render/cloud (port 443, never blocked).
+   * Only requires a verified single sender email — NO domain ownership needed.
+   * Free plan: 300 emails/day.
+   */
+  private static async sendViaBrevo(to: string, subject: string, html: string, text: string): Promise<boolean> {
+    const apiKey = (process.env.BREVO_API_KEY || '').replace(/["'\s]/g, '');
     if (!apiKey) return false;
 
-    // Use onboarding@resend.dev as from-address — this is Resend's universal test sender
-    // that can send to ANY email without domain verification
-    const from = (process.env.RESEND_FROM || 'UdtaBirdie <onboarding@resend.dev>').replace(/["']/g, '');
+    const fromEmail = (process.env.BREVO_FROM_EMAIL || process.env.SMTP_USER || '').replace(/["'\s]/g, '');
+    const fromName = (process.env.BREVO_FROM_NAME || 'UdtaBirdie').replace(/["']/g, '');
+
+    if (!fromEmail) {
+      console.error('[EMAIL-BREVO] ❌ BREVO_FROM_EMAIL not configured');
+      return false;
+    }
 
     try {
-      console.log(`[EMAIL-RESEND] Attempting Resend API dispatch to ${to}...`);
-      const res = await fetch('https://api.resend.com/emails', {
+      console.log(`[EMAIL-BREVO] Attempting Brevo dispatch to ${to}...`);
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'api-key': apiKey,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        body: JSON.stringify({ from, to: [to], subject, html, text }),
+        body: JSON.stringify({
+          sender: { name: fromName, email: fromEmail },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+          textContent: text,
+        }),
       });
       const data: any = await res.json().catch(() => ({}));
-      if (res.ok && data.id) {
-        console.log(`[EMAIL-RESEND] ✅ Delivered! Message ID: ${data.id}`);
+      if (res.ok && data.messageId) {
+        console.log(`[EMAIL-BREVO] ✅ Delivered! Message ID: ${data.messageId}`);
         return true;
       }
-      console.error(`[EMAIL-RESEND] ❌ Error ${res.status}:`, data.message || JSON.stringify(data));
+      console.error(`[EMAIL-BREVO] ❌ Error ${res.status}:`, data.message || JSON.stringify(data));
       return false;
     } catch (err: any) {
-      console.error('[EMAIL-RESEND] ❌ Request failed:', err.message);
+      console.error('[EMAIL-BREVO] ❌ Request failed:', err.message);
       return false;
     }
   }
@@ -266,7 +283,7 @@ If you did not sign up for UdtaBirdie, please ignore this email.
 `;
 
     // 1. Try Resend HTTP API first (bypasses Render/cloud SMTP port blocks)
-    const resendOk = await this.sendViaResend(
+    const resendOk = await this.sendViaBrevo(
       email,
       `${otp} is your UdtaBirdie verification code`,
       htmlContent,
@@ -335,7 +352,7 @@ This link is valid for 1 hour. If you did not request this, please ignore this e
 `;
 
     // 1. Try Resend HTTP API first
-    const resendOk = await this.sendViaResend(
+    const resendOk = await this.sendViaBrevo(
       email,
       'Reset your UdtaBirdie password',
       htmlContent,
