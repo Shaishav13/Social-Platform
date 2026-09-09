@@ -1,3 +1,5 @@
+import 'multer';
+
 export interface ProfileSettings {
   isPrivate: boolean;
   showEmail: boolean;
