@@ -8,7 +8,6 @@ const ForgotPassword: React.FC = () => {
   const [error, setError] = useState('');
   const [resetToken, setResetToken] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,24 +17,13 @@ const ForgotPassword: React.FC = () => {
     setError('');
 
     try {
-      const response = await api.post('/auth/forgot-password', { email: email.trim() });
+      await api.post('/auth/forgot-password', { email: email.trim() });
       setSubmitted(true);
-      if (response.data.resetToken) {
-        setResetToken(response.data.resetToken);
-      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const resetUrl = `${window.location.origin}/reset-password?token=${resetToken}`;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(resetUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -112,37 +100,37 @@ const ForgotPassword: React.FC = () => {
                 marginBottom: '20px',
               }}
             >
-              <p className="type-body-serif" style={{ fontSize: '0.95rem', marginBottom: '12px' }}>
-                A reset token was generated for <strong>{email}</strong>. This token expires in <strong>1 hour</strong>.
+              <p className="type-body-serif" style={{ fontSize: '0.95rem', marginBottom: '10px' }}>
+                If an account with <strong>{email}</strong> exists, password recovery instructions have been dispatched.
               </p>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={resetUrl}
-                  className="wren-input"
-                  style={{ fontSize: '0.8125rem' }}
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                />
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="wren-button wren-button--ghost"
-                  style={{ flexShrink: 0 }}
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
+              <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: 0 }}>
+                Please check your inbox (or your local server console in development mode).
+              </p>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <Link
-                to={`/reset-password?token=${resetToken}`}
-                className="wren-button wren-button--wine"
-                style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}
-              >
-                Reset Password Now
-              </Link>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div className="wren-form-group" style={{ marginBottom: '8px' }}>
+                <label htmlFor="manualToken" className="wren-label">
+                  Have a recovery token?
+                </label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    type="text"
+                    id="manualToken"
+                    placeholder="Paste recovery token here..."
+                    value={resetToken}
+                    onChange={(e) => setResetToken(e.target.value.trim())}
+                    className="wren-input"
+                  />
+                  <Link
+                    to={resetToken ? `/reset-password?token=${encodeURIComponent(resetToken)}` : '/reset-password'}
+                    className="wren-button wren-button--wine"
+                    style={{ flexShrink: 0, textDecoration: 'none' }}
+                  >
+                    Proceed
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -8,13 +8,21 @@ export class RedisConnection {
       return;
     }
 
-    this.client = createClient({
-      socket: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-      },
-      ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
-    });
+    const redisUrl = process.env.REDIS_URL;
+    if (redisUrl) {
+      this.client = createClient({
+        url: redisUrl,
+        socket: redisUrl.startsWith('rediss://') ? { tls: true, rejectUnauthorized: false } : undefined
+      });
+    } else {
+      this.client = createClient({
+        socket: {
+          host: process.env.REDIS_HOST || 'localhost',
+          port: parseInt(process.env.REDIS_PORT || '6379'),
+        },
+        ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
+      });
+    }
 
     this.client.on('error', (err) => {
       console.error('Redis Client Error:', err);

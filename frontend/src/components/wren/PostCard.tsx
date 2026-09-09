@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import type { Post, User } from '../../types';
 import { InteractionBar } from './InteractionBar';
 import { Icon, MediaViewerModal } from '../ui';
 import { resolveMediaUrl } from '../../utils/media';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 
 interface PostCardProps {
@@ -28,11 +29,42 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [likeCount, setLikeCount] = useState(post.likeCount || 0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content || '');
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const { user: authUser } = useAuth();
+  const effectiveUser = currentUser || authUser;
+
+  // Check if current user is author of post or platform admin
+  const isOwner = Boolean(
+    effectiveUser && (
+      effectiveUser.id === post.authorId ||
+      effectiveUser.id === post.author?.id
+    )
+  );
+  const isAdmin = effectiveUser?.role === 'admin';
+  const canManage = isOwner || isAdmin;
+
+  // Close dropdown menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+        setConfirmDelete(false);
+      }
+    };
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
 
   const handleMediaClick = (idx: number, e: React.MouseEvent) => {
     e.preventDefault();
@@ -40,8 +72,6 @@ export const PostCard: React.FC<PostCardProps> = ({
     setViewerIndex(idx);
     setViewerOpen(true);
   };
-
-  const isAuthor = currentUser && (currentUser.id === post.authorId || currentUser.id === post.author?.id);
 
   const formatTimestamp = (dateStr?: string) => {
     if (!dateStr) return '';
@@ -79,15 +109,18 @@ export const PostCard: React.FC<PostCardProps> = ({
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this letter permanently?')) return;
-
     try {
       setIsDeleting(true);
       await api.delete(`/content/posts/${post.id}`);
-      (onPostDelete || onDelete)?.(post.id);
-    } catch {
-      alert('Failed to delete letter.');
+      setIsMenuOpen(false);
+      setConfirmDelete(false);
+      if (onPostDelete) onPostDelete(post.id);
+      if (onDelete) onDelete(post.id);
+    } catch (err: any) {
+      console.error('Failed to delete letter:', err);
+      alert(err.response?.data?.message || 'Failed to delete letter. Check your connection or permissions.');
       setIsDeleting(false);
+      setConfirmDelete(false);
     }
   };
 
@@ -146,13 +179,17 @@ export const PostCard: React.FC<PostCardProps> = ({
             {formatTimestamp(post.createdAt)}
           </time>
 
-          {isAuthor && (
-            <div style={{ position: 'relative' }}>
+          {canManage && (
+            <div style={{ position: 'relative' }} ref={menuRef}>
               <button
                 type="button"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                style={{ background: 'none', border: 'none', color: 'var(--ink-600)', cursor: 'pointer', padding: '4px' }}
+                onClick={() => {
+                  setIsMenuOpen(!isMenuOpen);
+                  setConfirmDelete(false);
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--ink-600)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
                 aria-label="Post options"
+                title="Options"
               >
                 <Icon name="more" size={16} />
               </button>
@@ -165,44 +202,95 @@ export const PostCard: React.FC<PostCardProps> = ({
                     top: '100%',
                     backgroundColor: 'var(--paper-100)',
                     border: '1px solid var(--border)',
-                    borderRadius: '4px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
                     zIndex: 50,
-                    minWidth: '110px',
+                    minWidth: confirmDelete ? '160px' : '110px',
+                    padding: confirmDelete ? '10px' : '4px 0',
                   }}
                 >
-                  <button
-                    onClick={() => { setIsEditing(true); setIsMenuOpen(false); }}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '8px 12px',
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--ink-900)',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                    }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => { handleDelete(); setIsMenuOpen(false); }}
-                    disabled={isDeleting}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '8px 12px',
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--rust-alert)',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      borderTop: '1px solid var(--border)',
-                    }}
-                  >
-                    {isDeleting ? 'Deleting...' : 'Delete'}
-                  </button>
+                  {confirmDelete ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--ink-700)', fontFamily: 'var(--font-sans)', fontWeight: 600 }}>
+                        Delete permanently?
+                      </span>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={handleDelete}
+                          disabled={isDeleting}
+                          style={{
+                            flex: 1,
+                            backgroundColor: 'var(--rust-alert, #A63D40)',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '5px 8px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {isDeleting ? '...' : 'Confirm'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete(false)}
+                          disabled={isDeleting}
+                          style={{
+                            flex: 1,
+                            backgroundColor: 'var(--paper-200)',
+                            color: 'var(--ink-800)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '4px',
+                            padding: '5px 8px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {isOwner && (
+                        <button
+                          type="button"
+                          onClick={() => { setIsEditing(true); setIsMenuOpen(false); }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--ink-900)',
+                            cursor: 'pointer',
+                            fontSize: '13px',
+                          }}
+                        >
+                          Edit
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(true)}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '8px 12px',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--rust-alert)',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          borderTop: isOwner ? '1px solid var(--border)' : 'none',
+                        }}
+                      >
+                        {isAdmin && !isOwner ? 'Admin Delete' : 'Delete'}
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>

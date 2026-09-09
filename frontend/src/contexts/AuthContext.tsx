@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { User, LoginCredentials, RegisterData } from '../types';
+import type { User, LoginCredentials, RegisterData, VerifyEmailCredentials, RegisterResult } from '../types';
 import api from '../services/api';
 
 interface AuthContextType {
@@ -8,7 +8,9 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  register: (data: RegisterData) => Promise<RegisterResult>;
+  verifyEmail: (credentials: VerifyEmailCredentials) => Promise<void>;
+  resendVerificationOtp: (email: string) => Promise<string>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -27,6 +29,30 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem(key) : null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+      }
+    } catch {}
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+      }
+    } catch {}
+  },
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +61,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Check for existing token on mount
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
+    const token = safeStorage.getItem('authToken');
     if (token) {
       // Verify token and get user data
       api.get('/auth/me')
@@ -44,8 +70,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         })
         .catch(() => {
           // Token is invalid, clear it
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('refreshToken');
+          safeStorage.removeItem('authToken');
+          safeStorage.removeItem('refreshToken');
         })
         .finally(() => {
           setIsLoading(false);
@@ -60,34 +86,72 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await api.post('/auth/login', credentials);
       const { user, tokens } = response.data.data;
       
-      localStorage.setItem('authToken', tokens.accessToken);
-      localStorage.setItem('refreshToken', tokens.refreshToken);
+      safeStorage.setItem('authToken', tokens.accessToken);
+      safeStorage.setItem('refreshToken', tokens.refreshToken);
       setUser(user);
     } catch (error) {
       throw error;
     }
   };
 
-  const register = async (data: RegisterData) => {
+  const register = async (data: RegisterData): Promise<RegisterResult> => {
     try {
       // Remove confirmPassword before sending to backend
       const { confirmPassword, ...registerData } = data;
       const response = await api.post('/auth/register', registerData);
-      const { user, tokens } = response.data.data;
       
-      localStorage.setItem('authToken', tokens.accessToken);
-      localStorage.setItem('refreshToken', tokens.refreshToken);
-      setUser(user);
+      if (response.data.requiresVerification) {
+        return {
+          requiresVerification: true,
+          email: response.data.data?.email || registerData.email,
+          username: response.data.data?.username || registerData.username,
+        };
+      }
+
+      if (response.data.data?.tokens) {
+        const { user, tokens } = response.data.data;
+        safeStorage.setItem('authToken', tokens.accessToken);
+        safeStorage.setItem('refreshToken', tokens.refreshToken);
+        setUser(user);
+      }
+
+      return {
+        requiresVerification: false,
+        email: registerData.email,
+      };
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const verifyEmail = async (credentials: VerifyEmailCredentials): Promise<void> => {
+    try {
+      const response = await api.post('/auth/verify-email', credentials);
+      if (response.data.data?.tokens) {
+        const { user, tokens } = response.data.data;
+        safeStorage.setItem('authToken', tokens.accessToken);
+        safeStorage.setItem('refreshToken', tokens.refreshToken);
+        setUser(user);
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const resendVerificationOtp = async (email: string): Promise<string> => {
+    try {
+      const response = await api.post('/auth/resend-verification-otp', { email });
+      return response.data.message || 'Verification code dispatched';
     } catch (error) {
       throw error;
     }
   };
 
   const logout = () => {
-    const refreshToken = localStorage.getItem('refreshToken');
+    const refreshToken = safeStorage.getItem('refreshToken');
     
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('refreshToken');
+    safeStorage.removeItem('authToken');
+    safeStorage.removeItem('refreshToken');
     setUser(null);
     
     // Call logout endpoint to invalidate server-side session
@@ -110,6 +174,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     login,
     register,
+    verifyEmail,
+    resendVerificationOtp,
     logout,
     updateUser,
   };

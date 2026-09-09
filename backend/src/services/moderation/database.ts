@@ -124,7 +124,7 @@ export class ModerationDatabase {
       flag.contentId,
       flag.contentType,
       flag.flagType,
-      flag.confidence || 0.5,
+      (flag as any).confidence || 0.5,
       flag.reviewStatus || 'pending'
     ];
 

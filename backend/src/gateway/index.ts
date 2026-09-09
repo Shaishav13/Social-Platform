@@ -120,7 +120,7 @@ export class APIGateway {
     try {
       const response = await fetch(`${service.target}${service.healthCheck}`, {
         method: 'GET',
-        timeout: 5000
+        signal: typeof AbortSignal !== 'undefined' && (AbortSignal as any).timeout ? (AbortSignal as any).timeout(5000) : undefined
       });
       
       const isHealthy = response.ok;

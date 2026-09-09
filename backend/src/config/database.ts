@@ -8,16 +8,31 @@ export class DatabaseConnection {
       return;
     }
 
-    this.pool = new Pool({
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'social_media_platform',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'password',
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
+    const dbUrl = process.env.DATABASE_URL;
+    const isProduction = process.env.NODE_ENV === 'production';
+    const useSsl = isProduction || (dbUrl && (dbUrl.includes('sslmode=require') || dbUrl.includes('neon.tech') || dbUrl.includes('supabase')));
+
+    if (dbUrl) {
+      this.pool = new Pool({
+        connectionString: dbUrl,
+        ssl: useSsl ? { rejectUnauthorized: false } : false,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
+      });
+    } else {
+      this.pool = new Pool({
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432'),
+        database: process.env.DB_NAME || 'social_media_platform',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || 'password',
+        ssl: useSsl ? { rejectUnauthorized: false } : false,
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 5000,
+      });
+    }
 
     // Test the connection
     const client = await this.pool.connect();
@@ -32,7 +47,7 @@ export class DatabaseConnection {
     return this.pool.connect();
   }
 
-  static async query(text: string, params?: unknown[]): Promise<unknown> {
+  static async query(text: string, params?: any[]): Promise<any> {
     if (!this.pool) {
       throw new Error('Database not initialized. Call initialize() first.');
     }

@@ -11,7 +11,7 @@ const PostDetail: React.FC = () => {
   const [searchParams] = useSearchParams();
   const commentId = searchParams.get('comment');
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -140,6 +140,7 @@ const PostDetail: React.FC = () => {
         <div className="post-detail-content">
           <PostCard 
             post={post}
+            currentUser={user || undefined}
             onUpdate={handlePostUpdate}
             onDelete={handlePostDelete}
             isDetailView={true}

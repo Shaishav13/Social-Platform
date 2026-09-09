@@ -42,6 +42,10 @@ export class MockAuthDatabase {
       profilePicture: userData.profilePicture,
       bio: userData.bio,
       isPrivate: userData.isPrivate,
+      role: userData.role || 'user',
+      isRestricted: userData.isRestricted || false,
+      isVerified: userData.isVerified ?? true,
+      emailVerifiedAt: userData.emailVerifiedAt || now,
       createdAt: now,
       updatedAt: now,
     };

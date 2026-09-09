@@ -8,6 +8,8 @@ export interface User {
   isPrivate: boolean;
   role?: 'admin' | 'moderator' | 'user';
   isRestricted?: boolean;
+  isVerified?: boolean;
+  emailVerifiedAt?: string | null;
   followerCount?: number;
   followingCount?: number;
   postCount?: number;
@@ -94,6 +96,17 @@ export interface RegisterData {
   email: string;
   password: string;
   confirmPassword: string;
+}
+
+export interface VerifyEmailCredentials {
+  email: string;
+  otp: string;
+}
+
+export interface RegisterResult {
+  requiresVerification: boolean;
+  email: string;
+  username?: string;
 }
 
 export interface AuthResponse {

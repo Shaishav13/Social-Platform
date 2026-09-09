@@ -72,8 +72,14 @@ export class NotificationWebSocketService {
 
   private authenticateClient(ws: AuthenticatedWebSocket, token: string): void {
     try {
-      const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const secret = process.env.JWT_SECRET;
+      if (!secret || secret.trim() === '' || secret === 'your-secret-key') {
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error('FATAL SECURITY ERROR: JWT_SECRET must be configured with a strong secret in production.');
+        }
+      }
+      const JWT_SECRET = secret || 'udtabirdie_dev_super_secret_jwt_key_at_least_32_chars!';
+      const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as any;
       
       if (decoded && decoded.userId) {
         ws.userId = decoded.userId;

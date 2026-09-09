@@ -4,13 +4,7 @@ import { CreateReportRequest, CreateBlockRequest, ReviewReportRequest } from './
 import { ContentValidationMiddleware, ContentRateLimiter, AutoModerationService } from './contentValidation';
 import { SpamDetectionService } from './spamDetection';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    username: string;
-    email: string;
-  };
-}
+type AuthenticatedRequest = any;
 
 export function createModerationRoutes(moderationModels: ModerationModels): Router {
   const router = Router();
@@ -307,9 +301,9 @@ export function createModerationRoutes(moderationModels: ModerationModels): Rout
   });
 
   // Content validation middleware endpoints (for integration with other services)
-  router.use('/validate/post', ContentRateLimiter.rateLimitContent, contentValidator.validatePostContent);
-  router.use('/validate/comment', ContentRateLimiter.rateLimitContent, contentValidator.validateCommentContent);
-  router.use('/validate/blog', ContentRateLimiter.rateLimitContent, contentValidator.validateBlogContent);
+  router.use('/validate/post', ContentRateLimiter.rateLimitContent as any, contentValidator.validatePostContent as any);
+  router.use('/validate/comment', ContentRateLimiter.rateLimitContent as any, contentValidator.validateCommentContent as any);
+  router.use('/validate/blog', ContentRateLimiter.rateLimitContent as any, contentValidator.validateBlogContent as any);
 
   // Automated moderation trigger endpoint
   router.post('/auto-moderate', async (req: AuthenticatedRequest, res: Response) => {

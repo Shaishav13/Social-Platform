@@ -65,7 +65,8 @@ import * as fs from 'fs';
 app.use('/uploads', (req: express.Request, res: express.Response, next: express.NextFunction) => {
   // Set CORS headers FIRST, before any other processing
   const origin = req.headers.origin;
-  const allowedOrigins = ['http://localhost:3001', 'http://localhost:3002', 'http://localhost:3000', 'http://localhost:5173'];
+  const envOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : [];
+  const allowedOrigins = ['http://localhost:3001', 'http://localhost:3002', 'http://localhost:3000', 'http://localhost:5173', ...envOrigins];
   
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -85,23 +86,45 @@ app.use('/uploads', (req: express.Request, res: express.Response, next: express.
     return;
   }
   
-  // Handle GET requests for files
+  // Handle GET requests for files with strict path traversal & active content defense
   if (req.method === 'GET' || req.method === 'HEAD') {
-    const filePath = path.join(path.resolve(uploadsPath), req.path);
-    
+    // Reject null byte injection attempts
+    if (req.path.includes('\0') || req.path.includes('%00')) {
+      res.status(400).json({ error: 'Invalid file path' });
+      return;
+    }
+
+    const resolvedBase = path.resolve(uploadsPath);
+    // Normalize and strip leading relative parent directory sequences
+    const safePath = path.normalize(req.path).replace(/^(\.\.[\/\\])+/, '');
+    const filePath = path.resolve(resolvedBase, '.' + safePath);
+
+    // Strict boundary confinement check: prevent path traversal out of uploads directory
+    if (!filePath.startsWith(resolvedBase + path.sep) && filePath !== resolvedBase) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Do not serve hidden or dot files (.env, .git, etc.)
+    const baseName = path.basename(filePath);
+    if (baseName.startsWith('.')) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
     // Check if file exists
     if (!fs.existsSync(filePath)) {
       res.status(404).json({ error: 'File not found' });
       return;
     }
-    
+
     // Get file stats
     const stats = fs.statSync(filePath);
     if (!stats.isFile()) {
       res.status(404).json({ error: 'Not a file' });
       return;
     }
-    
+
     // Set content type based on file extension
     const ext = path.extname(filePath).toLowerCase();
     const contentTypes: { [key: string]: string } = {
@@ -116,30 +139,42 @@ app.use('/uploads', (req: express.Request, res: express.Response, next: express.
       '.avi': 'video/x-msvideo',
       '.webm': 'video/webm'
     };
-    
-    const contentType = contentTypes[ext] || 'application/octet-stream';
-    res.setHeader('Content-Type', contentType);
+
+    const contentType = contentTypes[ext];
+    if (!contentType) {
+      // Disallow non-whitelisted static file extensions from in-browser execution
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${baseName}"`);
+    } else {
+      res.setHeader('Content-Type', contentType);
+      // For SVG files, strictly isolate active content / scripts
+      if (ext === '.svg') {
+        res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
+      }
+    }
+
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Length', stats.size);
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.setHeader('ETag', `"${stats.mtime.getTime()}-${stats.size}"`);
     res.setHeader('Last-Modified', stats.mtime.toUTCString());
-    
+
     // Handle conditional requests
     const ifNoneMatch = req.headers['if-none-match'];
     const ifModifiedSince = req.headers['if-modified-since'];
     const etag = res.getHeader('ETag') as string;
-    
+
     if (ifNoneMatch === etag || (ifModifiedSince && new Date(ifModifiedSince) >= stats.mtime)) {
       res.status(304).end();
       return;
     }
-    
+
     // For HEAD requests, don't send body
     if (req.method === 'HEAD') {
       res.status(200).end();
       return;
     }
-    
+
     // Send file
     const stream = fs.createReadStream(filePath);
     stream.on('error', (error) => {
@@ -148,7 +183,7 @@ app.use('/uploads', (req: express.Request, res: express.Response, next: express.
         res.status(500).json({ error: 'Error reading file' });
       }
     });
-    
+
     stream.pipe(res);
     return;
   }
@@ -168,14 +203,8 @@ const monitoring = new MonitoringService();
 
 // Performance monitoring will be initialized after database connection
 
-// Security middleware (must be first, but skip for uploads)
-app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (req.path.startsWith('/uploads')) {
-    // Skip helmet for uploads to avoid restrictive headers
-    return next();
-  }
-  return securityHeaders(req, res, next);
-});
+// Security middleware
+app.use(securityHeaders);
 app.use(securityLogger);
 app.use(securityAudit);
 
@@ -195,7 +224,7 @@ app.use(compression({
 
 app.use(morgan(config.get('logging.format')));
 app.use(express.json({ 
-  limit: config.get('storage.maxFileSize'),
+  limit: '500kb',
   verify: (req, res, buf) => {
     // Store raw body for webhook verification if needed
     (req as any).rawBody = buf;
@@ -203,7 +232,7 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ 
   extended: true, 
-  limit: config.get('storage.maxFileSize')
+  limit: '500kb'
 }));
 
 // Input sanitization
@@ -215,8 +244,21 @@ app.use(sanitizeInput);
 // Rate limiting
 app.use(apiRateLimit);
 
-// Health check endpoint with comprehensive status
-app.get('/health', async (req, res) => {
+// Lightweight health check endpoint for uptime monitors
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Detailed diagnostic health check endpoint (restricted to localhost or internal network)
+app.get('/health/detailed', async (req, res) => {
+  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+  if (!isLocal && config.isProduction()) {
+    return res.status(403).json({ error: 'Access denied: diagnostics restricted to internal network' });
+  }
+
   const performanceSummary = monitoring.getPerformanceSummary();
   const alerts = monitoring.checkAlerts();
   const dbMetrics = await DatabaseOptimizer.getPerformanceMetrics();
@@ -243,18 +285,16 @@ app.get('/health', async (req, res) => {
     }
   };
 
-  // Return 503 if there are critical alerts
   const criticalAlerts = alerts.filter(alert => alert.severity === 'high');
   const statusCode = criticalAlerts.length > 0 ? 503 : 200;
-  
   res.status(statusCode).json(healthStatus);
 });
 
-// Detailed metrics endpoint (protected in production)
+// Detailed metrics endpoint (strictly restricted to localhost / internal monitoring)
 app.get('/metrics', (req, res) => {
-  // In production, this should be protected or only accessible internally
-  if (config.isProduction() && req.ip !== '127.0.0.1') {
-    return res.status(403).json({ error: 'Access denied' });
+  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+  if (!isLocal) {
+    return res.status(403).json({ error: 'Access denied: metrics restricted to internal monitoring' });
   }
 
   const allMetrics = monitoring.getAllMetrics();

@@ -17,6 +17,7 @@ import PublicRoute from './components/PublicRoute';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Feed from './pages/Feed';
@@ -56,6 +57,11 @@ function App() {
             <Route path="/register" element={
               <PublicRoute>
                 <Register />
+              </PublicRoute>
+            } />
+            <Route path="/verify-email" element={
+              <PublicRoute>
+                <VerifyEmail />
               </PublicRoute>
             } />
             <Route path="/forgot-password" element={

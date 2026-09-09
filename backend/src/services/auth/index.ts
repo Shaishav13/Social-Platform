@@ -6,4 +6,5 @@ export * from './models';
 export * from './database';
 export * from './middleware';
 export * from './sessionManager';
+export * from './emailService';
 export { default as authRoutes } from './routes';

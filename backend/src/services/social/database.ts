@@ -680,17 +680,22 @@ export class SocialDatabase {
     }
   }
 
-  static async updateFollowRequestStatus(requestId: string, status: 'accepted' | 'declined'): Promise<FollowRequest | null> {
+  static async updateFollowRequestStatus(requestId: string, status: 'accepted' | 'declined', targetId?: string): Promise<FollowRequest | null> {
     const client = await DatabaseConnection.getClient();
     
     try {
-      const result = await client.query(
-        `UPDATE follow_requests 
-         SET status = $1, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $2 
-         RETURNING id, requester_id, target_id, status, created_at, updated_at`,
-        [status, requestId]
-      );
+      const query = targetId
+        ? `UPDATE follow_requests 
+           SET status = $1, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $2 AND target_id = $3 AND status = 'pending'
+           RETURNING id, requester_id, target_id, status, created_at, updated_at`
+        : `UPDATE follow_requests 
+           SET status = $1, updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $2 AND status = 'pending'
+           RETURNING id, requester_id, target_id, status, created_at, updated_at`;
+
+      const params = targetId ? [status, requestId, targetId] : [status, requestId];
+      const result = await client.query(query, params);
 
       if (result.rows.length === 0) {
         return null;

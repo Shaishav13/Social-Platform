@@ -12,8 +12,6 @@ import { ProfileDatabase } from '../profile/database';
 
 export class UserModel {
   private static readonly SALT_ROUNDS = 12;
-  private static readonly JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-  private static readonly JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key';
   private static readonly ACCESS_TOKEN_EXPIRY = '15m';
   private static readonly REFRESH_TOKEN_EXPIRY = '7d';
 
@@ -23,6 +21,35 @@ export class UserModel {
 
   static async verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
     return bcrypt.compare(password, hashedPassword);
+  }
+
+  /**
+   * Generate a cryptographically secure 6-digit numeric OTP
+   */
+  static generateOTP(): string {
+    return crypto.randomInt(100000, 1000000).toString();
+  }
+
+  /**
+   * Compute a secure SHA-256 hash of an OTP
+   */
+  static hashOtp(otp: string): string {
+    return crypto.createHash('sha256').update(otp.trim()).digest('hex');
+  }
+
+  /**
+   * Verify an incoming OTP against the stored SHA-256 hash using constant-time comparison
+   */
+  static verifyOtpHash(plainOtp: string, storedHash: string): boolean {
+    const inputHash = this.hashOtp(plainOtp);
+    const inputBuffer = Buffer.from(inputHash, 'hex');
+    const storedBuffer = Buffer.from(storedHash, 'hex');
+
+    if (inputBuffer.length !== storedBuffer.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(inputBuffer, storedBuffer);
   }
 
   static validatePassword(password: string): { isValid: boolean; errors: string[] } {
@@ -131,9 +158,17 @@ export class UserModel {
       bio: userData.bio,
       profilePicture: undefined,
       isPrivate: false,
+      role: 'user',
+      isRestricted: false,
+      isVerified: false,
+      emailVerifiedAt: null,
     });
 
     return newUser;
+  }
+
+  static async findUserByEmail(email: string): Promise<User | null> {
+    return AuthDatabase.findUserByEmail(email);
   }
 
   static async authenticateUser(email: string, password: string): Promise<User | null> {
@@ -154,16 +189,29 @@ export class UserModel {
     return user;
   }
 
+  private static getJWTSecret(): string {
+    const secret = process.env.JWT_SECRET;
+    if (!secret || secret.trim() === '' || secret === 'your-secret-key') {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('FATAL SECURITY ERROR: JWT_SECRET must be configured with a strong secret (min 32 chars) in production.');
+      }
+      return 'udtabirdie_dev_super_secret_jwt_key_at_least_32_chars!';
+    }
+    return secret;
+  }
+
   static generateAccessToken(user: User): string {
     const payload: JWTPayload = {
       userId: user.id,
       username: user.username,
       email: user.email,
       role: user.role || 'user',
+      isVerified: user.isVerified ?? false,
     };
 
-    return jwt.sign(payload, this.JWT_SECRET, {
+    return jwt.sign(payload, this.getJWTSecret(), {
       expiresIn: this.ACCESS_TOKEN_EXPIRY,
+      algorithm: 'HS256',
     });
   }
 
@@ -192,7 +240,9 @@ export class UserModel {
 
   static verifyAccessToken(token: string): JWTPayload | null {
     try {
-      const decoded = jwt.verify(token, this.JWT_SECRET) as JWTPayload;
+      const decoded = jwt.verify(token, this.getJWTSecret(), {
+        algorithms: ['HS256'],
+      }) as JWTPayload;
       return decoded;
     } catch (error) {
       return null;

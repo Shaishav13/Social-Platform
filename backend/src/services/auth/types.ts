@@ -8,6 +8,8 @@ export interface User {
   isPrivate: boolean;
   role?: 'admin' | 'moderator' | 'user';
   isRestricted?: boolean;
+  isVerified?: boolean;
+  emailVerifiedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,11 +40,33 @@ export interface RegisterRequest {
   bio?: string | undefined;
 }
 
+export interface VerifyEmailRequest {
+  email: string;
+  otp: string;
+}
+
+export interface ResendOtpRequest {
+  email: string;
+}
+
+export interface EmailVerificationRecord {
+  id: string;
+  userId: string;
+  email: string;
+  otpHash: string;
+  expiresAt: Date;
+  attempts: number;
+  maxAttempts: number;
+  lastSentAt: Date;
+  createdAt: Date;
+}
+
 export interface JWTPayload {
   userId: string;
   username: string;
   email: string;
   role?: 'admin' | 'moderator' | 'user';
+  isVerified?: boolean;
   iat?: number;
   exp?: number;
-}
+}

@@ -63,8 +63,12 @@ const Register: React.FC = () => {
     setErrors({});
 
     try {
-      await register(formData);
-      navigate('/feed');
+      const result = await register(formData);
+      if (result.requiresVerification) {
+        navigate(`/verify-email?email=${encodeURIComponent(result.email)}`);
+      } else {
+        navigate('/feed');
+      }
     } catch (err: unknown) {
       const responseData = (err as { response?: { data?: { errors?: string[]; message?: string } } })?.response?.data;
       let errorMessage = 'Registration failed. Please try again.';

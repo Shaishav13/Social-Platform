@@ -330,6 +330,8 @@ export class ContentDatabase {
     try {
       await client.query('BEGIN');
 
+      // Clean up likes on comments of this post
+      await client.query(`DELETE FROM likes WHERE target_type = 'comment' AND target_id IN (SELECT id FROM comments WHERE post_id = $1)`, [postId]);
       // Clean up likes on this post
       await client.query(`DELETE FROM likes WHERE target_id = $1 AND target_type = 'post'`, [postId]);
       // Clean up notifications referencing this post

@@ -662,7 +662,7 @@ router.delete('/media/:id', authenticateToken, async (req: Request, res: Respons
 });
 
 // GET /content/feed - Get user feed with pagination and enhanced sorting
-router.get('/feed', async (req: Request, res: Response): Promise<void> => {
+router.get('/feed', optionalAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user?.userId;
     const page = parseInt(req.query.page as string) || 1;

@@ -2,13 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { SpamDetectionService, SpamDetectionResult } from './spamDetection';
 import { ModerationModels } from './models';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    username: string;
-    email: string;
-  };
-}
+type AuthenticatedRequest = any;
 
 interface ContentValidationOptions {
   autoFlag?: boolean;

@@ -43,7 +43,7 @@ export class ProfileDatabase {
       DatabaseConnection.query(countQuery, [query])
     ]);
 
-    const users = searchResult.rows.map((row: any) => ({
+    const users = (searchResult as any).rows.map((row: any) => ({
       id: row.id,
       username: row.username,
       bio: row.bio,
@@ -53,7 +53,7 @@ export class ProfileDatabase {
       updatedAt: row.updated_at
     }));
 
-    const totalCount = parseInt(countResult.rows[0].total);
+    const totalCount = parseInt((countResult as any).rows[0].total);
 
     return { users, totalCount };
   }

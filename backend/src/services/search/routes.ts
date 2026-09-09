@@ -73,7 +73,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 
     const searchQuery: SearchQuery = {
       query: sanitizedQuery,
-      contentType: contentType === 'users' ? 'all' : contentType,
+      contentType: (contentType as any) === 'users' ? 'all' : contentType,
       tags,
       page,
       limit,

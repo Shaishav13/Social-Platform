@@ -40,8 +40,19 @@ export class FileStorageService {
     originalName: string, 
     mimeType: string
   ): Promise<{ filename: string; url: string }> {
-    const fileExtension = path.extname(originalName);
-    const filename = `${uuidv4()}${fileExtension}`;
+    const ext = path.extname(originalName).toLowerCase();
+    const safeExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.webm', '.avi'];
+    if (!safeExtensions.includes(ext)) {
+      throw new Error(`Disallowed file extension: ${ext}. Only standard image and video formats are permitted.`);
+    }
+
+    // Inspect file header for active executable content or scripts
+    const sample = buffer.slice(0, 1024).toString('utf8').toLowerCase();
+    if (sample.includes('<script') || sample.includes('<?php') || sample.includes('javascript:') || sample.includes('<html')) {
+      throw new Error('File validation failed: Active executable or script content detected in upload.');
+    }
+
+    const filename = `${uuidv4()}${ext}`;
     
     if (this.config.type === 'local') {
       return this.saveFileLocally(buffer, filename, mimeType);

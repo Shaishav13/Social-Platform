@@ -12,6 +12,8 @@ const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [requiresVerification, setRequiresVerification] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -23,13 +25,21 @@ const Login: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setRequiresVerification(false);
 
     try {
       await login(credentials);
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Login failed. Please check your credentials.';
-      setError(errorMsg);
+      const respData = (err as { response?: { data?: { message?: string; requiresVerification?: boolean; email?: string } } })?.response?.data;
+      if (respData?.requiresVerification) {
+        setRequiresVerification(true);
+        setUnverifiedEmail(respData.email || credentials.email);
+        setError(respData.message || 'Your email address is not verified. Please verify your email before logging in.');
+      } else {
+        const errorMsg = respData?.message || 'Login failed. Please check your credentials.';
+        setError(errorMsg);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -68,7 +78,26 @@ const Login: React.FC = () => {
 
         {error && (
           <div className="wren-error" role="alert">
-            {error}
+            <div>{error}</div>
+            {requiresVerification && (
+              <div style={{ marginTop: '12px' }}>
+                <Link
+                  to={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}`}
+                  className="type-ui-s"
+                  style={{
+                    display: 'inline-block',
+                    backgroundColor: 'var(--wine-700)',
+                    color: '#ffffff',
+                    padding: '8px 16px',
+                    borderRadius: '4px',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Verify Email Now →
+                </Link>
+              </div>
+            )}
           </div>
         )}
 

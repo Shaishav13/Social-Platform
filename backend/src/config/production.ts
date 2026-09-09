@@ -37,7 +37,8 @@ export class ProductionConfig {
 
       // Database configuration
       database: {
-        host: process.env.DB_HOST || 'localhost',
+        url: process.env.DATABASE_URL,
+        host: process.env.DB_HOST || (process.env.DATABASE_URL ? 'remote' : 'localhost'),
         port: parseInt(process.env.DB_PORT || '5432', 10),
         name: process.env.DB_NAME || 'social_media_platform',
         user: process.env.DB_USER || 'postgres',
@@ -50,7 +51,8 @@ export class ProductionConfig {
 
       // Redis configuration
       redis: {
-        host: process.env.REDIS_HOST || 'localhost',
+        url: process.env.REDIS_URL,
+        host: process.env.REDIS_HOST || (process.env.REDIS_URL ? 'remote' : 'localhost'),
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
         password: process.env.REDIS_PASSWORD || '',
         db: parseInt(process.env.REDIS_DB || '0', 10),
@@ -258,18 +260,25 @@ export function validateEnvironment() {
   console.log('🔧 Validating environment configuration...');
   
   // Check database connection
-  if (!config.get('database.host')) {
-    throw new Error('Database host not configured');
+  if (!process.env.DATABASE_URL && !config.get('database.host')) {
+    throw new Error('Database host or DATABASE_URL not configured');
   }
   
   // Check Redis connection
-  if (!config.get('redis.host')) {
-    console.warn('⚠️  Redis host not configured - some features may not work');
+  if (!process.env.REDIS_URL && !config.get('redis.host')) {
+    console.warn('⚠️  Redis host/REDIS_URL not configured - some features may not work');
   }
   
   // Check file storage
   if (config.get('storage.type') === 's3' && !config.get('storage.s3.bucket')) {
     throw new Error('S3 bucket not configured for S3 storage type');
+  }
+
+  // Security check for production
+  if (process.env.NODE_ENV === 'production') {
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+      console.warn('⚠️  SECURITY WARNING: In production, JWT_SECRET should be explicitly set and at least 32 characters long!');
+    }
   }
   
   console.log('✅ Environment configuration validated');

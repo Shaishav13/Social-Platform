@@ -6,8 +6,16 @@ import { RegisterRequest, LoginRequest } from './types';
 import { authenticateToken } from './middleware';
 import { AuthDatabase } from './database';
 import { DatabaseConnection } from '../../config/database';
+import { EmailService } from './emailService';
+import { createRateLimiter } from '../../middleware/security';
 
 const router = Router();
+
+// Dedicated rate limiters for auth endpoints
+const registerLimiter = createRateLimiter(15 * 60 * 1000, 15, 'Too many registration requests from this IP. Please try again later.');
+const loginLimiter = createRateLimiter(15 * 60 * 1000, 30, 'Too many login attempts from this IP. Please try again later.');
+const verifyOtpLimiter = createRateLimiter(15 * 60 * 1000, 30, 'Too many verification attempts from this IP. Please try again later.');
+const resendOtpLimiter = createRateLimiter(15 * 60 * 1000, 10, 'Too many OTP resend requests from this IP. Please try again later.');
 
 // Validation schemas
 const registerSchema = Joi.object({
@@ -62,13 +70,40 @@ const loginSchema = Joi.object({
     }),
 });
 
+const verifyEmailSchema = Joi.object({
+  email: Joi.string()
+    .email()
+    .required()
+    .messages({
+      'string.email': 'Invalid email format',
+      'any.required': 'Email is required',
+    }),
+  otp: Joi.string()
+    .pattern(/^\d{6}$/)
+    .required()
+    .messages({
+      'string.pattern.base': 'Verification code must be exactly 6 digits',
+      'any.required': 'Verification code is required',
+    }),
+});
+
+const resendOtpSchema = Joi.object({
+  email: Joi.string()
+    .email()
+    .required()
+    .messages({
+      'string.email': 'Invalid email format',
+      'any.required': 'Email is required',
+    }),
+});
+
 // Sanitization helper
 function sanitizeInput(input: string): string {
   return input.trim().replace(/[<>]/g, '');
 }
 
 // POST /auth/register
-router.post('/register', async (req: Request, res: Response) => {
+router.post('/register', registerLimiter, async (req: Request, res: Response) => {
   try {
     // Validate request body
     const { error, value } = registerSchema.validate(req.body, { abortEarly: false });
@@ -88,21 +123,78 @@ router.post('/register', async (req: Request, res: Response) => {
       bio: value.bio ? sanitizeInput(value.bio) : undefined,
     };
 
-    // Create user
+    // Check if user with this email already exists
+    const existingUser = await AuthDatabase.findUserByEmail(registerData.email);
+    if (existingUser) {
+      if (existingUser.isVerified) {
+        return res.status(409).json({
+          success: false,
+          message: 'User with this email already exists',
+        });
+      }
+
+      // User exists but has not verified email yet. Allow resending OTP and updating credentials
+      const existingByUsername = await AuthDatabase.findUserByUsername(registerData.username);
+      if (existingByUsername && existingByUsername.id !== existingUser.id) {
+        return res.status(409).json({
+          success: false,
+          message: 'User with this username already exists',
+        });
+      }
+
+      // Update unverified user's credentials
+      const newPasswordHash = await UserModel.hashPassword(registerData.password);
+      await DatabaseConnection.query(
+        'UPDATE users SET username = $1, password_hash = $2, bio = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4',
+        [registerData.username, newPasswordHash, registerData.bio || null, existingUser.id]
+      );
+
+      // Generate 6-digit OTP
+      const otp = UserModel.generateOTP();
+      const otpHash = UserModel.hashOtp(otp);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      await AuthDatabase.createOrUpdateEmailVerification(existingUser.id, existingUser.email, otpHash, expiresAt);
+      await EmailService.sendVerificationOtp(existingUser.email, registerData.username, otp);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Account registration updated. A 6-digit verification code has been dispatched to your email.',
+        requiresVerification: true,
+        data: {
+          email: existingUser.email,
+          username: registerData.username,
+        },
+      });
+    }
+
+    // Check if username is already taken
+    const existingUserByUsername = await AuthDatabase.findUserByUsername(registerData.username);
+    if (existingUserByUsername) {
+      return res.status(409).json({
+        success: false,
+        message: 'User with this username already exists',
+      });
+    }
+
+    // Create user (unverified by default)
     const user = await UserModel.createUser(registerData);
 
-    // Generate tokens
-    const tokens = await UserModel.generateTokens(user);
+    // Generate 6-digit OTP
+    const otp = UserModel.generateOTP();
+    const otpHash = UserModel.hashOtp(otp);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // Return success response (exclude password hash)
-    const { passwordHash, ...userResponse } = user;
-    
+    await AuthDatabase.createOrUpdateEmailVerification(user.id, user.email, otpHash, expiresAt);
+    await EmailService.sendVerificationOtp(user.email, user.username, otp);
+
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: 'User registered successfully. A 6-digit verification code has been dispatched to your email.',
+      requiresVerification: true,
       data: {
-        user: userResponse,
-        tokens,
+        email: user.email,
+        username: user.username,
       },
     });
 
@@ -146,8 +238,174 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
+// POST /auth/verify-email
+router.post('/verify-email', verifyOtpLimiter, async (req: Request, res: Response) => {
+  try {
+    const { error, value } = verifyEmailSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message,
+      });
+    }
+
+    const email = sanitizeInput(value.email.toLowerCase());
+    const otp = value.otp.trim();
+
+    // Look up user
+    const user = await AuthDatabase.findUserByEmail(email);
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification request',
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(200).json({
+        success: true,
+        alreadyVerified: true,
+        message: 'Email is already verified. You can log in directly.',
+      });
+    }
+
+    // Look up active verification record
+    const verifRecord = await AuthDatabase.findActiveEmailVerification(email);
+    if (!verifRecord) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired or is invalid. Please request a new code.',
+      });
+    }
+
+    // Check maximum attempts
+    if (verifRecord.attempts >= verifRecord.maxAttempts) {
+      await AuthDatabase.deleteEmailVerification(verifRecord.id);
+      return res.status(400).json({
+        success: false,
+        message: 'Maximum verification attempts exceeded. Please request a new code.',
+      });
+    }
+
+    // Constant-time timing-safe OTP verification
+    const isMatch = UserModel.verifyOtpHash(otp, verifRecord.otpHash);
+    if (!isMatch) {
+      const attempts = await AuthDatabase.incrementVerificationAttempts(verifRecord.id);
+      const remaining = Math.max(0, verifRecord.maxAttempts - attempts);
+
+      if (remaining <= 0) {
+        await AuthDatabase.deleteEmailVerification(verifRecord.id);
+        return res.status(400).json({
+          success: false,
+          message: 'Maximum attempts exceeded. This code is now invalid. Please request a new code.',
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`,
+      });
+    }
+
+    // OTP matched! Invalidate verification record and mark user verified
+    await AuthDatabase.deleteEmailVerification(verifRecord.id);
+    await AuthDatabase.markUserVerified(user.id);
+
+    // Update in-memory user instance
+    user.isVerified = true;
+    user.emailVerifiedAt = new Date();
+
+    // Generate access & refresh tokens
+    const tokens = await UserModel.generateTokens(user);
+
+    const { passwordHash, ...userResponse } = user;
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully! Welcome to UdtaBirdie.',
+      data: {
+        user: userResponse,
+        tokens,
+      },
+    });
+
+  } catch (error: any) {
+    console.error('Email verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+});
+
+// POST /auth/resend-verification-otp
+router.post('/resend-verification-otp', resendOtpLimiter, async (req: Request, res: Response) => {
+  try {
+    const { error, value } = resendOtpSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.details[0].message,
+      });
+    }
+
+    const email = sanitizeInput(value.email.toLowerCase());
+
+    const user = await AuthDatabase.findUserByEmail(email);
+
+    // If user doesn't exist, return safe response to avoid email enumeration
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: 'If an unverified account with that email exists, a verification code has been dispatched.',
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(200).json({
+        success: true,
+        alreadyVerified: true,
+        message: 'This email is already verified. You can log in directly.',
+      });
+    }
+
+    // Check cooldown from last sent time
+    const existingRecord = await AuthDatabase.findActiveEmailVerification(email);
+    if (existingRecord) {
+      const elapsedSeconds = (Date.now() - existingRecord.lastSentAt.getTime()) / 1000;
+      if (elapsedSeconds < 60) {
+        const retryAfter = Math.ceil(60 - elapsedSeconds);
+        return res.status(429).json({
+          success: false,
+          message: `Please wait ${retryAfter} seconds before requesting another code.`,
+          retryAfter,
+        });
+      }
+    }
+
+    // Generate fresh OTP
+    const otp = UserModel.generateOTP();
+    const otpHash = UserModel.hashOtp(otp);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await AuthDatabase.createOrUpdateEmailVerification(user.id, user.email, otpHash, expiresAt);
+    await EmailService.sendVerificationOtp(user.email, user.username, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'A new verification code has been dispatched to your email address.',
+    });
+
+  } catch (error: any) {
+    console.error('Resend OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+});
+
 // POST /auth/login
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', loginLimiter, async (req: Request, res: Response) => {
   try {
     // Validate request body
     const { error, value } = loginSchema.validate(req.body);
@@ -165,13 +423,24 @@ router.post('/login', async (req: Request, res: Response) => {
       password: value.password,
     };
 
-    // Authenticate user
+    // Authenticate user credentials
     const user = await UserModel.authenticateUser(loginData.email, loginData.password);
     
     if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
+      });
+    }
+
+    // Check if email has been verified
+    if (user.isVerified === false) {
+      return res.status(403).json({
+        success: false,
+        code: 'EMAIL_NOT_VERIFIED',
+        requiresVerification: true,
+        email: user.email,
+        message: 'Your email address is not verified. Please verify your email before logging in.',
       });
     }
 
@@ -193,6 +462,13 @@ router.post('/login', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('Login error:', error);
     
+    if (error.message?.includes('restricted')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -594,12 +870,14 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     const token = crypto.randomBytes(32).toString('hex');
     await AuthDatabase.createPasswordResetToken(user.id, token);
 
-    // Return the token directly (dev/self-hosted — no email service required)
+    // Dispatch password reset email via EmailService
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/reset-password?token=${token}`;
+    await EmailService.sendPasswordResetEmail(user.email, resetUrl);
+
+    // Always return safe generic confirmation without leaking the token
     res.json({
       success: true,
-      message: 'Password reset token generated.',
-      resetToken: token,
-      // Frontend constructs the full URL; we just provide the token
+      message: 'If an account with that email exists, password reset instructions have been dispatched.',
     });
   } catch (error: any) {
     console.error('Forgot password error:', error);

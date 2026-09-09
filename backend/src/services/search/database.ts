@@ -58,7 +58,6 @@ export class SearchDatabase {
         SELECT 
           u.id,
           u.username,
-          u.email,
           u.bio,
           u.profile_picture,
           u.is_private,
@@ -95,7 +94,6 @@ export class SearchDatabase {
       const results = searchResult.rows.map((row: any) => ({
         id: row.id,
         username: row.username,
-        email: row.email,
         bio: row.bio,
         profilePicture: row.profile_picture,
         isPrivate: row.is_private,
@@ -269,7 +267,7 @@ export class SearchDatabase {
       )`
     ];
     
-    let params = [query];
+    let params: any[] = [query];
     let paramCount = 2;
 
     if (tags && tags.length > 0) {

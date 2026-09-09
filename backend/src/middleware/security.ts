@@ -90,15 +90,28 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
     'confirmPassword',
     'currentPassword',
     'newPassword',
-    'refreshToken'
+    'refreshToken',
+    'otp'
   ]);
 
   const sanitizeString = (str: string): string => {
-    return str
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
-      .replace(/javascript:/gi, '') // Remove javascript: protocol
-      .replace(/on\w+\s*=/gi, '') // Remove event handlers
-      .trim();
+    let prev = '';
+    let current = str;
+    // Recursive loop to defeat nested tag evasion (e.g. <scr<script>ipt>)
+    let loops = 0;
+    while (prev !== current && loops < 5) {
+      prev = current;
+      current = current
+        .replace(/<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, '')
+        .replace(/<\s*(?:iframe|embed|object|meta|base|link|style)\b[^>]*>/gi, '')
+        .replace(/<\s*\/\s*(?:iframe|embed|object|meta|base|link|style)\s*>/gi, '')
+        .replace(/javascript\s*:/gi, '')
+        .replace(/vbscript\s*:/gi, '')
+        .replace(/data\s*:\s*text\/html/gi, '')
+        .replace(/\bon\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
+      loops++;
+    }
+    return current.trim();
   };
 
   const sanitizeObject = (obj: any): any => {
@@ -272,7 +285,7 @@ export const securityLogger = (req: Request, res: Response, next: NextFunction) 
 // CORS configuration for production
 export const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || [
       'http://localhost:3000', 
       'http://localhost:3001', 
       'http://localhost:3002',

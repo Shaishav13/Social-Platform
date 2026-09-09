@@ -240,15 +240,10 @@ export class FollowModel {
   }
 
   static async acceptFollowRequest(requestId: string, targetId: string): Promise<{ success: boolean; message: string }> {
-    // Update request status to accepted
-    const updatedRequest = await SocialDatabase.updateFollowRequestStatus(requestId, 'accepted');
+    // Atomically verify ownership and pending status while updating in the database
+    const updatedRequest = await SocialDatabase.updateFollowRequestStatus(requestId, 'accepted', targetId);
     if (!updatedRequest) {
-      return { success: false, message: 'Follow request not found' };
-    }
-
-    // Verify the request belongs to the target user
-    if (updatedRequest.targetId !== targetId) {
-      return { success: false, message: 'Unauthorized to accept this request' };
+      return { success: false, message: 'Follow request not found, already processed, or unauthorized' };
     }
 
     // Create the follow relationship
@@ -258,15 +253,10 @@ export class FollowModel {
   }
 
   static async declineFollowRequest(requestId: string, targetId: string): Promise<{ success: boolean; message: string }> {
-    // Update request status to declined
-    const updatedRequest = await SocialDatabase.updateFollowRequestStatus(requestId, 'declined');
+    // Atomically verify ownership and pending status while updating in the database
+    const updatedRequest = await SocialDatabase.updateFollowRequestStatus(requestId, 'declined', targetId);
     if (!updatedRequest) {
-      return { success: false, message: 'Follow request not found' };
-    }
-
-    // Verify the request belongs to the target user
-    if (updatedRequest.targetId !== targetId) {
-      return { success: false, message: 'Unauthorized to decline this request' };
+      return { success: false, message: 'Follow request not found, already processed, or unauthorized' };
     }
 
     return { success: true, message: 'Follow request declined' };
