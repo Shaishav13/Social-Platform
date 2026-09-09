@@ -107,15 +107,62 @@ router.get('/smtp-status', (_req: Request, res: Response) => {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
+  const resendKey = process.env.RESEND_API_KEY || process.env.RESEND_KEY || '';
 
   res.json({
-    configured: !!(host && user && pass),
-    host: host || 'not configured',
-    port: process.env.SMTP_PORT || '587',
-    userConfigured: !!user,
-    userMasked: user ? `${user.substring(0, 3)}***@${user.split('@')[1] || ''}` : 'none',
-    passwordConfigured: !!pass,
+    smtp: {
+      configured: !!(host && user && pass),
+      host: host || 'not configured',
+      port: process.env.SMTP_PORT || '587',
+      userMasked: user ? `${user.substring(0, 3)}***@${user.split('@')[1] || ''}` : 'none',
+    },
+    resend: {
+      configured: !!resendKey,
+      keyMasked: resendKey ? `${resendKey.substring(0, 6)}...${resendKey.slice(-4)}` : 'none',
+      from: process.env.RESEND_FROM || 'UdtaBirdie <onboarding@resend.dev>',
+    },
   });
+});
+
+// GET /auth/resend-status - live diagnostic: calls Resend API and returns exact response
+router.get('/resend-status', async (_req: Request, res: Response) => {
+  const apiKey = (process.env.RESEND_API_KEY || process.env.RESEND_KEY || '').replace(/["'\s]/g, '');
+  if (!apiKey) {
+    return res.status(400).json({ error: 'RESEND_API_KEY not configured on this server' });
+  }
+
+  try {
+    // Check account/domain status via Resend API
+    const domainRes = await fetch('https://api.resend.com/domains', {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    const domainData: any = await domainRes.json().catch(() => ({}));
+
+    // Also try sending a real test email to capture exact error
+    const from = (process.env.RESEND_FROM || 'UdtaBirdie <onboarding@resend.dev>').replace(/["']/g, '');
+    const sendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to: ['diagnostics@resend.dev'],
+        subject: 'UdtaBirdie Diagnostic Test',
+        text: 'Diagnostic test',
+      }),
+    });
+    const sendData: any = await sendRes.json().catch(() => ({}));
+
+    res.json({
+      apiKeyOk: domainRes.ok || sendRes.status !== 401,
+      domains: domainData,
+      testSend: { status: sendRes.status, body: sendData },
+      recommendation: !domainData?.data?.length
+        ? 'No verified domains. Add a domain at resend.com/domains or verify a single sender at resend.com/settings/senders'
+        : 'Domain found. Set RESEND_FROM env var to: YourName <you@yourdomain.com>',
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // POST /auth/test-email (Direct test dispatch to verify SMTP email delivery)
