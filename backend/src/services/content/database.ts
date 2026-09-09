@@ -115,6 +115,25 @@ export class ContentDatabase {
           uploader_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
+
+        -- Ensure uploader_id and size_bytes exist if table was created with alternative column names
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'media_files' AND column_name = 'uploader_id') THEN
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'media_files' AND column_name = 'uploaded_by') THEN
+              ALTER TABLE media_files RENAME COLUMN uploaded_by TO uploader_id;
+            ELSE
+              ALTER TABLE media_files ADD COLUMN uploader_id UUID REFERENCES users(id) ON DELETE CASCADE;
+            END IF;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'media_files' AND column_name = 'size_bytes') THEN
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'media_files' AND column_name = 'size') THEN
+              ALTER TABLE media_files RENAME COLUMN size TO size_bytes;
+            ELSE
+              ALTER TABLE media_files ADD COLUMN size_bytes BIGINT DEFAULT 0;
+            END IF;
+          END IF;
+        END $$;
       `);
 
       // Create post_media junction table for many-to-many relationship
