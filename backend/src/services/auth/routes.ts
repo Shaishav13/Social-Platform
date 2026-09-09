@@ -217,7 +217,9 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await AuthDatabase.createOrUpdateEmailVerification(user.id, user.email, otpHash, expiresAt);
-    await EmailService.sendVerificationOtp(user.email, user.username, otp);
+    EmailService.sendVerificationOtp(user.email, user.username, otp).catch(err => {
+      console.error('[EMAIL] Async registration email error:', err);
+    });
 
     res.status(201).json({
       success: true,
@@ -419,7 +421,9 @@ router.post('/resend-verification-otp', resendOtpLimiter, async (req: Request, r
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await AuthDatabase.createOrUpdateEmailVerification(user.id, user.email, otpHash, expiresAt);
-    await EmailService.sendVerificationOtp(user.email, user.username, otp);
+    EmailService.sendVerificationOtp(user.email, user.username, otp).catch(err => {
+      console.error('[EMAIL] Async resend email error:', err);
+    });
 
     res.status(200).json({
       success: true,

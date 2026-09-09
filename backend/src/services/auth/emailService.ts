@@ -35,12 +35,18 @@ export class EmailService {
           ? {
               service: 'gmail',
               auth: { user: cleanUser, pass: cleanPass },
+              connectionTimeout: 4000,
+              greetingTimeout: 4000,
+              socketTimeout: 4000,
             }
           : {
               host,
               port,
               secure,
               auth: { user: cleanUser, pass: cleanPass },
+              connectionTimeout: 4000,
+              greetingTimeout: 4000,
+              socketTimeout: 4000,
               tls: {
                 rejectUnauthorized: false,
               },
