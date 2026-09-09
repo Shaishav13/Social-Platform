@@ -25,12 +25,18 @@ export class EmailService {
           ? {
               service: 'gmail',
               auth: { user: cleanUser, pass: cleanPass },
+              connectionTimeout: 6000,
+              greetingTimeout: 6000,
+              socketTimeout: 6000,
             }
           : {
               host,
               port,
               secure,
               auth: { user: cleanUser, pass: cleanPass },
+              connectionTimeout: 6000,
+              greetingTimeout: 6000,
+              socketTimeout: 6000,
               tls: {
                 rejectUnauthorized: false,
               },
@@ -48,6 +54,74 @@ export class EmailService {
     }
 
     return this.transporter;
+  }
+
+  /**
+   * Dispatch email via HTTP REST API (Resend or Brevo)
+   * This completely bypasses cloud SMTP port 25/465/587 blocks (e.g., Render Free tier)
+   */
+  private static async sendViaHttpApi(to: string, subject: string, html: string, text: string): Promise<boolean> {
+    const resendApiKey = process.env.RESEND_API_KEY?.trim();
+    if (resendApiKey) {
+      try {
+        const fromAddress = process.env.EMAIL_FROM || 'UdtaBirdie <onboarding@resend.dev>';
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: fromAddress,
+            to: [to],
+            subject,
+            html,
+            text,
+          }),
+        });
+        if (res.ok) {
+          console.log(`[EMAIL-HTTP] Dispatched via Resend API to ${to}`);
+          return true;
+        } else {
+          const errBody = await res.text();
+          console.error(`[EMAIL-HTTP] Resend API error: ${res.status}`, errBody);
+        }
+      } catch (err) {
+        console.error('[EMAIL-HTTP] Failed to call Resend API:', err);
+      }
+    }
+
+    const brevoApiKey = process.env.BREVO_API_KEY?.trim();
+    if (brevoApiKey) {
+      try {
+        const senderEmail = process.env.SMTP_USER?.trim() || 'udtabirdie@gmail.com';
+        const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': brevoApiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sender: { name: 'UdtaBirdie', email: senderEmail },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+            textContent: text,
+          }),
+        });
+        if (res.ok) {
+          console.log(`[EMAIL-HTTP] Dispatched via Brevo API to ${to}`);
+          return true;
+        } else {
+          const errBody = await res.text();
+          console.error(`[EMAIL-HTTP] Brevo API error: ${res.status}`, errBody);
+        }
+      } catch (err) {
+        console.error('[EMAIL-HTTP] Failed to call Brevo API:', err);
+      }
+    }
+
+    return false;
   }
 
   private static getSenderAddress(): string {
@@ -214,6 +288,12 @@ Security Notice: Never share this code with anyone. UdtaBirdie staff will never 
 If you did not sign up for UdtaBirdie, please ignore this email.
 `;
 
+    // If HTTP API credentials exist (Resend / Brevo), use them first (cloud firewall / port block immune)
+    if (process.env.RESEND_API_KEY || process.env.BREVO_API_KEY) {
+      const sent = await this.sendViaHttpApi(email, `${otp} is your UdtaBirdie verification code`, htmlContent, textContent);
+      if (sent) return true;
+    }
+
     // If SMTP is available, send via SMTP
     if (transporter) {
       try {
@@ -275,6 +355,12 @@ ${resetUrl}
 
 This link is valid for 1 hour. If you did not request this, please ignore this email.
 `;
+
+    // If HTTP API credentials exist (Resend / Brevo), use them first
+    if (process.env.RESEND_API_KEY || process.env.BREVO_API_KEY) {
+      const sent = await this.sendViaHttpApi(email, 'Reset your UdtaBirdie password', htmlContent, textContent);
+      if (sent) return true;
+    }
 
     if (transporter) {
       try {

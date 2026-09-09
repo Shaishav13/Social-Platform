@@ -168,8 +168,10 @@ const VerifyEmail: React.FC = () => {
       setOtpDigits(['', '', '', '', '', '']);
       if (inputRefs.current[0]) inputRefs.current[0]?.focus();
     } catch (err: unknown) {
-      const respData = (err as { response?: { data?: { message?: string } } })?.response?.data;
-      setErrorMessage(respData?.message || 'Failed to resend code. Please try again in a few moments.');
+      const axiosErr = err as { response?: { data?: { message?: string; error?: string }; status?: number }; message?: string };
+      const respData = axiosErr?.response?.data;
+      const errorMsg = respData?.message || respData?.error || (axiosErr?.message?.includes('timeout') ? 'Request timed out. Please try again in a moment.' : 'Failed to resend code. Please try again in a few moments.');
+      setErrorMessage(errorMsg);
     } finally {
       setIsResending(false);
     }
