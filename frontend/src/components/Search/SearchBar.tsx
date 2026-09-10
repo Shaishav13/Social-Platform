@@ -42,9 +42,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`search-bar ${className}`}>
-      <div className="search-input-container">
-        <div className="search-icon">🔍</div>
+    <form onSubmit={handleSubmit} className={`search-bar ${className}`} style={{ width: '100%', marginBottom: '24px' }}>
+      <div className="search-input-container" style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--paper-100)', border: '1px solid var(--border)', borderRadius: '24px', padding: '8px 16px', transition: 'border-color 0.2s, box-shadow 0.2s', position: 'relative' }}>
+        <div className="search-icon" style={{ opacity: 0.6, fontSize: '16px', marginRight: '8px' }}>🔍</div>
         <input
           type="text"
           value={query}
@@ -52,12 +52,15 @@ const SearchBar: React.FC<SearchBarProps> = ({
           placeholder={placeholder}
           className="search-input"
           autoComplete="off"
+          style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontSize: '16px', color: 'var(--ink)' }}
         />
         {query.trim() && (
           <button 
             type="button"
             onClick={() => setQuery('')}
             className="search-clear"
+            title="Clear search"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', opacity: 0.6, padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             ✕
           </button>

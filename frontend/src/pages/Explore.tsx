@@ -247,29 +247,29 @@ const Explore: React.FC = () => {
               
               {/* Trending Topics Widget */}
               <div className="trending-topics-widget">
-                <div className="widget-header">
-                  <h3>📊 Trending Topics</h3>
+                <div className="widget-header" style={{ marginBottom: '16px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>📊 Trending Topics</h3>
                 </div>
-                <div className="trending-topics-list">
-                  <div className="trending-topic">
-                    <span className="topic-name">#Technology</span>
-                    <span className="topic-count">1.2K posts</span>
+                <div className="trending-topics-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="trending-topic" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="topic-name" style={{ fontWeight: 600, color: 'var(--ink)' }}>#Technology</span>
+                    <span className="topic-count" style={{ color: 'var(--ink-400)', fontSize: '13px' }}>1.2K posts</span>
                   </div>
-                  <div className="trending-topic">
-                    <span className="topic-name">#Photography</span>
-                    <span className="topic-count">856 posts</span>
+                  <div className="trending-topic" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="topic-name" style={{ fontWeight: 600, color: 'var(--ink)' }}>#Photography</span>
+                    <span className="topic-count" style={{ color: 'var(--ink-400)', fontSize: '13px' }}>856 posts</span>
                   </div>
-                  <div className="trending-topic">
-                    <span className="topic-name">#Travel</span>
-                    <span className="topic-count">642 posts</span>
+                  <div className="trending-topic" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="topic-name" style={{ fontWeight: 600, color: 'var(--ink)' }}>#Travel</span>
+                    <span className="topic-count" style={{ color: 'var(--ink-400)', fontSize: '13px' }}>642 posts</span>
                   </div>
-                  <div className="trending-topic">
-                    <span className="topic-name">#Food</span>
-                    <span className="topic-count">534 posts</span>
+                  <div className="trending-topic" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="topic-name" style={{ fontWeight: 600, color: 'var(--ink)' }}>#Food</span>
+                    <span className="topic-count" style={{ color: 'var(--ink-400)', fontSize: '13px' }}>534 posts</span>
                   </div>
-                  <div className="trending-topic">
-                    <span className="topic-name">#Art</span>
-                    <span className="topic-count">423 posts</span>
+                  <div className="trending-topic" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="topic-name" style={{ fontWeight: 600, color: 'var(--ink)' }}>#Art</span>
+                    <span className="topic-count" style={{ color: 'var(--ink-400)', fontSize: '13px' }}>423 posts</span>
                   </div>
                 </div>
               </div>
