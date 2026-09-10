@@ -197,9 +197,9 @@ router.get('/resend-status', async (_req: Request, res: Response) => {
 
 // POST /auth/test-email (Direct test dispatch to verify SMTP email delivery)
 router.post('/test-email', async (req: Request, res: Response) => {
-  const email = (req.body.email || '').trim().toLowerCase();
+  const email = (req.body.email || req.query.email || '').toString().trim().toLowerCase();
   if (!email || !email.includes('@')) {
-    return res.status(400).json({ success: false, message: 'Valid email address required in { email }' });
+    return res.status(400).json({ success: false, message: 'Valid email address required in { email } body or query param' });
   }
 
   const success = await EmailService.sendVerificationOtp(email, 'UdtaBirdie Test', '123456');
