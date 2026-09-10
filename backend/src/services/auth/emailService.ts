@@ -71,8 +71,9 @@ export class EmailService {
 
   /**
    * Send email via Resend HTTP API (port 443 — never blocked by Render/cloud firewalls).
-   * Resend free tier: 100 emails/day. Works with any recipient when sending FROM the account owner email.
-   * Set RESEND_FROM_EMAIL to the email address you signed up to Resend with.
+   * Free tier (no custom domain): must send FROM onboarding@resend.dev → can reach ANY recipient, 100 emails/day.
+   * With a verified custom domain: use your own FROM address.
+   * RESEND_FROM_EMAIL env var: only needed if you have a verified Resend domain. Otherwise onboarding@resend.dev is used.
    */
   private static async sendViaResend(to: string, subject: string, html: string, text: string): Promise<boolean> {
     const apiKey = (process.env.RESEND_API_KEY || process.env.RESEND_KEY || '').replace(/["'\s]/g, '');
@@ -81,20 +82,21 @@ export class EmailService {
       return false;
     }
 
-    // Use the account email as the sender (this is what Resend allows on free tier)
-    const fromEmail = (
-      process.env.RESEND_FROM_EMAIL ||
-      process.env.SMTP_USER ||
-      ''
-    ).replace(/["'\s]/g, '');
-    const fromName = (process.env.RESEND_FROM_NAME || 'UdtaBirdie').replace(/["']/g, '');
+    // On Resend free tier (no verified domain), you MUST send FROM onboarding@resend.dev.
+    // Using a gmail or other unverified address as FROM causes a 422 "Domain is not verified" error.
+    // Only override this if RESEND_FROM_EMAIL is a verified Resend domain (not gmail/yahoo/etc).
+    const customFromEmail = (process.env.RESEND_FROM_EMAIL || '').replace(/["'\s]/g, '');
+    const isVerifiedDomain = customFromEmail && 
+      !customFromEmail.includes('@gmail.') && 
+      !customFromEmail.includes('@yahoo.') && 
+      !customFromEmail.includes('@hotmail.') && 
+      !customFromEmail.includes('@outlook.');
 
-    if (!fromEmail) {
-      console.error('[EMAIL-RESEND] ❌ No sender email configured. Set RESEND_FROM_EMAIL in your Render environment variables.');
-      return false;
-    }
-
-    const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+    const fromEmail = isVerifiedDomain ? customFromEmail : 'onboarding@resend.dev';
+    const fromName = isVerifiedDomain 
+      ? (process.env.RESEND_FROM_NAME || 'UdtaBirdie').replace(/["']/g, '')
+      : 'UdtaBirdie';
+    const from = `${fromName} <${fromEmail}>`;
 
     try {
       console.log(`[EMAIL-RESEND] Attempting Resend dispatch from=${from} to=${to}...`);

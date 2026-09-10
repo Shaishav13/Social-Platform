@@ -484,8 +484,8 @@ router.post('/resend-verification-otp', resendOtpLimiter, async (req: Request, r
     const existingRecord = await AuthDatabase.findActiveEmailVerification(email);
     if (existingRecord) {
       const elapsedSeconds = (Date.now() - existingRecord.lastSentAt.getTime()) / 1000;
-      if (elapsedSeconds < 60) {
-        const retryAfter = Math.ceil(60 - elapsedSeconds);
+      if (elapsedSeconds < 30) {
+        const retryAfter = Math.ceil(30 - elapsedSeconds);
         return res.status(429).json({
           success: false,
           message: `Please wait ${retryAfter} seconds before requesting another code.`,
