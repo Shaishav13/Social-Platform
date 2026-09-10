@@ -79,6 +79,8 @@ const PostDetail: React.FC = () => {
 
       if (response.data.success) {
         setPost(response.data.data);
+      } else if (response.data.post) {
+        setPost(response.data.post);
       } else {
         setError('Post not found');
       }
