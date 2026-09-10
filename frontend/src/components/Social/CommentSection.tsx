@@ -194,46 +194,52 @@ const CommentSection: React.FC<CommentSectionProps> = ({
             }}
             className="reply-form"
           >
-            <div className="reply-input-container">
+            <div className="reply-input-container" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginTop: '12px', marginLeft: '32px' }}>
               {currentUser?.profilePicture ? (
                 <img 
                   src={currentUser.profilePicture} 
                   alt={currentUser.username}
                   className="reply-avatar"
+                  style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
                 />
               ) : (
-                <div className="reply-avatar-placeholder">
+                <div className="reply-avatar-placeholder" style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--brand-surface)', color: 'var(--brand-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px', flexShrink: 0 }}>
                   {currentUser?.username?.charAt(0).toUpperCase() || 'U'}
                 </div>
               )}
-              <input
-                type="text"
-                value={replyTexts[comment.id] || ''}
-                onChange={(e) => setReplyTexts(prev => ({ ...prev, [comment.id]: e.target.value }))}
-                placeholder={`Reply to ${comment.author?.username}...`}
-                className="reply-input"
-                disabled={isSubmitting}
-                autoFocus
-              />
-              <div className="reply-actions">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setReplyingTo(null);
-                    setReplyTexts(prev => ({ ...prev, [comment.id]: '' }));
-                  }}
-                  className="reply-cancel-btn"
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input
+                  type="text"
+                  value={replyTexts[comment.id] || ''}
+                  onChange={(e) => setReplyTexts(prev => ({ ...prev, [comment.id]: e.target.value }))}
+                  placeholder={`Reply to ${comment.author?.username}...`}
+                  className="reply-input"
                   disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  disabled={!(replyTexts[comment.id] || '').trim() || isSubmitting}
-                  className="reply-submit-btn"
-                >
-                  {isSubmitting ? 'Posting...' : 'Post'}
-                </button>
+                  autoFocus
+                  style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: '20px', backgroundColor: 'var(--paper)', fontSize: '14px', outline: 'none' }}
+                />
+                <div className="reply-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setReplyingTo(null);
+                      setReplyTexts(prev => ({ ...prev, [comment.id]: '' }));
+                    }}
+                    className="wren-btn wren-btn-secondary"
+                    disabled={isSubmitting}
+                    style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '16px' }}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={!(replyTexts[comment.id] || '').trim() || isSubmitting}
+                    className="wren-btn wren-btn-primary"
+                    style={{ padding: '6px 16px', fontSize: '13px', borderRadius: '16px', opacity: !(replyTexts[comment.id] || '').trim() || isSubmitting ? 0.6 : 1 }}
+                  >
+                    {isSubmitting ? 'Posting...' : 'Reply'}
+                  </button>
+                </div>
               </div>
             </div>
           </form>
@@ -277,15 +283,16 @@ const CommentSection: React.FC<CommentSectionProps> = ({
       {/* Comment Form */}
       {currentUser && (
         <form onSubmit={handleSubmitComment} className="comment-form">
-          <div className="comment-input-container">
+          <div className="comment-input-container" style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginTop: '16px', padding: '16px', backgroundColor: 'var(--paper-100)', borderRadius: '12px', border: '1px solid var(--border)' }}>
             {currentUser.profilePicture ? (
               <img 
                 src={currentUser.profilePicture} 
                 alt={currentUser.username}
                 className="comment-form-avatar"
+                style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
               />
             ) : (
-              <div className="comment-form-avatar-placeholder">
+              <div className="comment-form-avatar-placeholder" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--brand-surface)', color: 'var(--brand-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px', flexShrink: 0 }}>
                 {currentUser.username?.charAt(0).toUpperCase()}
               </div>
             )}
@@ -296,11 +303,13 @@ const CommentSection: React.FC<CommentSectionProps> = ({
               placeholder="Add a comment..."
               className="comment-input"
               disabled={isSubmitting}
+              style={{ flex: 1, padding: '12px 16px', border: '1px solid var(--border)', borderRadius: '24px', backgroundColor: 'var(--paper)', fontSize: '15px', outline: 'none', transition: 'border-color 0.2s', width: '100%' }}
             />
             <button 
               type="submit"
               disabled={!newComment.trim() || isSubmitting}
-              className="comment-submit-btn"
+              className="wren-btn wren-btn-primary"
+              style={{ padding: '10px 20px', borderRadius: '24px', alignSelf: 'center', opacity: !newComment.trim() || isSubmitting ? 0.6 : 1 }}
             >
               {isSubmitting ? 'Posting...' : 'Post'}
             </button>

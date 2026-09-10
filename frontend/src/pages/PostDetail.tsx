@@ -128,15 +128,16 @@ const PostDetail: React.FC = () => {
   return (
     <div className="post-detail-page">
       <div className="post-detail-container">
-        <div className="post-detail-header">
+        <div className="post-detail-header" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
           <button 
             onClick={() => navigate(-1)}
-            className="back-button"
+            className="wren-btn wren-btn-secondary"
             title="Go back"
+            style={{ padding: '6px 12px', fontSize: '14px' }}
           >
             ← Back
           </button>
-          <h2>Post Details</h2>
+          <h2 style={{ margin: 0, fontFamily: 'var(--font-serif)', fontSize: '24px' }}>Post Details</h2>
         </div>
 
         <div className="post-detail-content">
