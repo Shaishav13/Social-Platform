@@ -14,7 +14,7 @@ const VerifyEmail: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(60);
+  const [resendCooldown, setResendCooldown] = useState(30);
 
   const { verifyEmail, resendVerificationOtp } = useAuth();
   const navigate = useNavigate();
@@ -164,7 +164,7 @@ const VerifyEmail: React.FC = () => {
     try {
       const msg = await resendVerificationOtp(email.trim().toLowerCase());
       setInfoMessage((msg || 'A fresh verification code has been dispatched to your email.') + ' Please also check your Spam or Junk folder.');
-      setResendCooldown(60);
+      setResendCooldown(30);
       setOtpDigits(['', '', '', '', '', '']);
       if (inputRefs.current[0]) inputRefs.current[0]?.focus();
     } catch (err: unknown) {

@@ -261,133 +261,28 @@ export class EmailService {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UdtaBirdie Account Verification</title>
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #121214;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      color: #e4e4e7;
-    }
-    .wrapper {
-      width: 100%;
-      background-color: #121214;
-      padding: 40px 16px;
-      box-sizing: border-box;
-    }
-    .container {
-      max-width: 520px;
-      margin: 0 auto;
-      background-color: #18181b;
-      border: 1px solid #27272a;
-      border-radius: 12px;
-      padding: 36px 32px;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
-      border-bottom: 1px solid #27272a;
-      padding-bottom: 16px;
-    }
-    .brand-title {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      color: #ffffff;
-    }
-    .hero-text {
-      font-size: 22px;
-      font-weight: 700;
-      color: #fafafa;
-      margin: 0 0 12px 0;
-    }
-    .body-text {
-      font-size: 15px;
-      line-height: 1.6;
-      color: #a1a1aa;
-      margin: 0 0 24px 0;
-    }
-    .otp-box {
-      background: linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(225, 29, 72, 0.04) 100%);
-      border: 1px solid rgba(244, 63, 94, 0.3);
-      border-radius: 8px;
-      padding: 24px;
-      text-align: center;
-      margin-bottom: 24px;
-    }
-    .otp-code {
-      font-size: 38px;
-      font-weight: 800;
-      letter-spacing: 10px;
-      color: #f43f5e;
-      font-family: 'Courier New', Courier, monospace;
-      margin: 0;
-    }
-    .otp-caption {
-      font-size: 13px;
-      color: #71717a;
-      margin-top: 8px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .alert-box {
-      background-color: rgba(244, 63, 94, 0.08);
-      border-left: 3px solid #f43f5e;
-      padding: 12px 16px;
-      border-radius: 4px;
-      margin-bottom: 24px;
-    }
-    .alert-text {
-      font-size: 13px;
-      color: #fda4af;
-      margin: 0;
-      line-height: 1.5;
-    }
-    .footer {
-      border-top: 1px solid #27272a;
-      padding-top: 20px;
-      margin-top: 24px;
-      font-size: 12px;
-      color: #52525b;
-      line-height: 1.5;
-      text-align: center;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #333333; margin: 0; padding: 20px; background-color: #f9f9f9; }
+    .container { max-width: 500px; margin: 0 auto; background: #ffffff; border: 1px solid #eaeaea; border-radius: 8px; padding: 30px; }
+    .header { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #111111; }
+    .body-text { font-size: 15px; line-height: 1.5; color: #555555; margin-bottom: 24px; }
+    .otp-code { font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #111111; text-align: center; background: #f4f4f5; padding: 16px; border-radius: 6px; margin-bottom: 24px; }
+    .footer { border-top: 1px solid #eaeaea; padding-top: 20px; font-size: 13px; color: #999999; text-align: center; }
   </style>
 </head>
 <body>
-  <div class="wrapper">
-    <div class="container">
-      <div class="header">
-        <span class="brand-title">UdtaBirdie Socials</span>
-      </div>
-      <h1 class="hero-text">Verify Your Email Address</h1>
-      <p class="body-text">
-        Hello <strong>${username}</strong>, thank you for joining UdtaBirdie. Use the one-time verification code below to confirm your account:
-      </p>
-
-      <div class="otp-box">
-        <div class="otp-code">${otp}</div>
-        <div class="otp-caption">Valid for ${expiryMinutes} minutes</div>
-      </div>
-
-      <div class="alert-box">
-        <p class="alert-text">
-          <strong>Security Notice:</strong> Never share this code with anyone. UdtaBirdie staff will never ask for your verification code.
-        </p>
-      </div>
-
-      <p class="body-text" style="font-size: 13px;">
-        If you did not initiate this account registration on UdtaBirdie, you can safely disregard this email.
-      </p>
-
-      <div class="footer">
-        &copy; ${new Date().getFullYear()} UdtaBirdie Social Platform. All rights reserved.
-      </div>
+  <div class="container">
+    <div class="header">UdtaBirdie Socials</div>
+    <p class="body-text">
+      Hi <strong>${username}</strong>,<br><br>
+      Please use the verification code below to confirm your email address. This code is valid for ${expiryMinutes} minutes.
+    </p>
+    <div class="otp-code">${otp}</div>
+    <p class="body-text" style="font-size: 14px;">
+      If you did not sign up for an account, you can safely ignore this email.
+    </p>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} UdtaBirdie Socials
     </div>
   </div>
 </body>
@@ -466,17 +361,29 @@ If you did not sign up for UdtaBirdie, please ignore this email.
 <head>
   <meta charset="UTF-8">
   <style>
-    body { background-color: #121214; font-family: sans-serif; color: #e4e4e7; margin: 0; padding: 30px; }
-    .card { max-width: 480px; margin: 0 auto; background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 30px; }
-    .btn { display: inline-block; background: #e11d48; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; margin: 20px 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #333333; margin: 0; padding: 20px; background-color: #f9f9f9; }
+    .container { max-width: 500px; margin: 0 auto; background: #ffffff; border: 1px solid #eaeaea; border-radius: 8px; padding: 30px; }
+    .header { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #111111; }
+    .body-text { font-size: 15px; line-height: 1.5; color: #555555; margin-bottom: 24px; }
+    .btn { display: inline-block; background: #e11d48; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 15px; }
+    .footer { border-top: 1px solid #eaeaea; padding-top: 20px; font-size: 13px; color: #999999; text-align: center; margin-top: 24px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>Reset Your UdtaBirdie Password</h2>
-    <p>A password reset was requested for your account. Click the button below to choose a new password:</p>
-    <a href="${resetUrl}" class="btn" style="color: #ffffff;">Reset Password</a>
-    <p style="font-size: 13px; color: #71717a;">This link is valid for 1 hour. If you did not request a password reset, please ignore this message.</p>
+  <div class="container">
+    <div class="header">UdtaBirdie Socials</div>
+    <p class="body-text">
+      A password reset was requested for your account. Click the button below to choose a new password:
+    </p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${resetUrl}" class="btn">Reset Password</a>
+    </div>
+    <p class="body-text" style="font-size: 14px;">
+      This link is valid for 1 hour. If you did not request a password reset, you can safely ignore this email.
+    </p>
+    <div class="footer">
+      &copy; ${new Date().getFullYear()} UdtaBirdie Socials
+    </div>
   </div>
 </body>
 </html>
