@@ -11,62 +11,83 @@ try {
 }
 
 export class EmailService {
-  private static transporter: Transporter | null = null;
+  private static brevoTransporter: Transporter | null = null;
+  private static gmailTransporter: Transporter | null = null;
   private static initialized = false;
 
-  private static getTransporter(): Transporter | null {
-    if (this.initialized) {
-      return this.transporter;
-    }
-
+  private static initTransporters(): void {
+    if (this.initialized) return;
     this.initialized = true;
-    const host = process.env.SMTP_HOST;
-    const port = parseInt(process.env.SMTP_PORT || '587', 10);
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    const secure = process.env.SMTP_SECURE === 'true' || port === 465;
 
-    if (host && user && pass) {
+    // ── Brevo SMTP relay ────────────────────────────────────────────────────
+    // The BREVO_API_KEY env var starting with "xsmtpsib-" IS a Brevo SMTP password.
+    // Brevo SMTP relay (smtp-relay.brevo.com:587) works from Render (port never blocked),
+    // sends to ANY recipient, and doesn't need a verified custom domain.
+    // Login username = the Brevo account email (BREVO_FROM_EMAIL or SMTP_USER).
+    const brevoKey = (process.env.BREVO_API_KEY || '').replace(/["'\s]/g, '');
+    const brevoEmail = (process.env.BREVO_FROM_EMAIL || process.env.SMTP_USER || '').replace(/["'\s]/g, '');
+
+    if (brevoKey && brevoEmail) {
       try {
-        const cleanUser = user.trim();
-        const cleanPass = pass.replace(/["']/g, '').trim();
-
-        // IMPORTANT: Do NOT use `service: 'gmail'` — it auto-picks port 465 (SSL)
-        // and ignores dns.setDefaultResultOrder, causing ENETUNREACH on IPv6-only paths.
-        // Use explicit host + port 587 (STARTTLS) + family:4 (force IPv4) instead.
-        const isGmail = host === 'smtp.gmail.com';
-        const transportConfig: any = {
-          host: isGmail ? 'smtp.gmail.com' : host,
-          port: isGmail ? 587 : port,
-          secure: false,           // false = STARTTLS on port 587 (not SSL on 465)
-          family: 4,               // Force IPv4 — prevents ENETUNREACH on Render's IPv6 paths
-          auth: { user: cleanUser, pass: cleanPass },
-          connectionTimeout: 10000,
-          greetingTimeout: 10000,
-          socketTimeout: 10000,
-          tls: {
-            rejectUnauthorized: false,
-            minVersion: 'TLSv1.2',
-          },
-        };
-
-        this.transporter = nodemailer.createTransport(transportConfig);
-        console.log(`[EMAIL] SMTP transporter initialized with host/service: ${host}:${port} for ${cleanUser}`);
+        this.brevoTransporter = nodemailer.createTransport({
+          host: 'smtp-relay.brevo.com',
+          port: 587,
+          secure: false,     // STARTTLS
+          family: 4,         // Force IPv4 — avoid ENETUNREACH on Render
+          auth: { user: brevoEmail, pass: brevoKey },
+          connectionTimeout: 12000,
+          greetingTimeout: 12000,
+          socketTimeout: 15000,
+          tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' },
+        } as any);
+        console.log(`[EMAIL] ☁️ Brevo SMTP transporter ready (smtp-relay.brevo.com:587) for ${brevoEmail}`);
       } catch (err) {
-        console.error('[EMAIL] Failed to initialize SMTP transporter:', err);
-        this.transporter = null;
+        console.error('[EMAIL] Failed to initialize Brevo SMTP transporter:', err);
+        this.brevoTransporter = null;
       }
     } else {
-      console.log('[EMAIL] No SMTP credentials configured. Running in development console-logging mode.');
-      this.transporter = null;
+      console.log('[EMAIL] Brevo SMTP not configured (need BREVO_API_KEY + BREVO_FROM_EMAIL).');
     }
 
-    return this.transporter;
+    // ── Gmail SMTP fallback ──────────────────────────────────────────────────
+    // Used only if Brevo is unavailable. Requires an App Password (not regular password).
+    // Explicit host+port 587 + family:4 avoids the IPv6/ENETUNREACH issue on Render.
+    const gmailHost = process.env.SMTP_HOST;
+    const gmailUser = process.env.SMTP_USER;
+    const gmailPass = process.env.SMTP_PASS;
+
+    if (gmailHost && gmailUser && gmailPass) {
+      try {
+        const cleanUser = gmailUser.trim();
+        const cleanPass = gmailPass.replace(/["']/g, '').trim();
+        this.gmailTransporter = nodemailer.createTransport({
+          host: gmailHost,
+          port: 587,
+          secure: false,
+          family: 4,
+          auth: { user: cleanUser, pass: cleanPass },
+          connectionTimeout: 12000,
+          greetingTimeout: 12000,
+          socketTimeout: 15000,
+          tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' },
+        } as any);
+        console.log(`[EMAIL] 📧 Gmail SMTP fallback ready (${gmailHost}:587) for ${cleanUser}`);
+      } catch (err) {
+        console.error('[EMAIL] Failed to initialize Gmail SMTP transporter:', err);
+        this.gmailTransporter = null;
+      }
+    }
   }
 
-  private static getSenderAddress(): string {
-    const defaultSender = process.env.SMTP_USER ? `"UdtaBirdie" <${process.env.SMTP_USER.trim()}>` : '"UdtaBirdie" <noreply@udtabirdie.com>';
-    return process.env.EMAIL_FROM || defaultSender;
+  private static getBrevoSender(): string {
+    const email = (process.env.BREVO_FROM_EMAIL || process.env.SMTP_USER || '').replace(/["'\s]/g, '');
+    const name = (process.env.BREVO_FROM_NAME || 'UdtaBirdie').replace(/["']/g, '');
+    return email ? `"${name}" <${email}>` : '"UdtaBirdie" <noreply@udtabirdie.com>';
+  }
+
+  private static getGmailSender(): string {
+    const email = (process.env.SMTP_USER || '').trim();
+    return process.env.EMAIL_FROM || (email ? `"UdtaBirdie" <${email}>` : '"UdtaBirdie" <noreply@udtabirdie.com>');
   }
 
   /**
@@ -182,7 +203,9 @@ export class EmailService {
    * Send 6-digit email verification OTP to new account via SMTP
    */
   static async sendVerificationOtp(email: string, username: string, otp: string): Promise<boolean> {
-    const transporter = this.getTransporter();
+    // Initialize transporters (idempotent — safe to call multiple times)
+    this.initTransporters();
+
     const expiryMinutes = 10;
 
     const htmlContent = `
@@ -336,52 +359,53 @@ Security Notice: Never share this code with anyone. UdtaBirdie staff will never 
 If you did not sign up for UdtaBirdie, please ignore this email.
 `;
 
-    // 1. Try Resend HTTP API first (port 443, works on Render, free 100/day)
-    const resendOk = await this.sendViaResend(
-      email,
-      `${otp} is your UdtaBirdie verification code`,
-      htmlContent,
-      textContent,
-    );
-    if (resendOk) return true;
+    const subject = `${otp} is your UdtaBirdie verification code`;
 
-    // 2. Try Brevo as secondary (port 443, works on Render, free 300/day)
-    const brevoOk = await this.sendViaBrevo(
-      email,
-      `${otp} is your UdtaBirdie verification code`,
-      htmlContent,
-      textContent,
-    );
-    if (brevoOk) return true;
-
-    // 2. Fall back to SMTP
-    if (transporter) {
+    // 1. PRIMARY: Brevo SMTP relay (smtp-relay.brevo.com:587)
+    //    Uses xsmtpsib- key as SMTP password. Works on Render. Sends to any email.
+    if (this.brevoTransporter) {
       try {
-        const info = await transporter.sendMail({
-          from: this.getSenderAddress(),
+        const info = await this.brevoTransporter.sendMail({
+          from: this.getBrevoSender(),
           to: email,
-          subject: `${otp} is your UdtaBirdie verification code`,
+          subject,
           text: textContent,
           html: htmlContent,
         });
-        console.log(`[EMAIL] Verification OTP email dispatched to ${email} (MessageID: ${info.messageId})`);
+        console.log(`[EMAIL-BREVO-SMTP] ✅ OTP dispatched to ${email} (MsgID: ${info.messageId})`);
         return true;
       } catch (err: any) {
-        console.error(`[EMAIL] Failed to send verification email to ${email}:`, err.message);
-        this.logConsoleOtp(email, username, otp, expiryMinutes);
-        return false;
+        console.error(`[EMAIL-BREVO-SMTP] ❌ Failed: ${err.message}`);
       }
-    } else {
-      this.logConsoleOtp(email, username, otp, expiryMinutes);
-      return true;
     }
+
+    // 2. FALLBACK: Gmail SMTP (smtp.gmail.com:587 + App Password)
+    if (this.gmailTransporter) {
+      try {
+        const info = await this.gmailTransporter.sendMail({
+          from: this.getGmailSender(),
+          to: email,
+          subject,
+          text: textContent,
+          html: htmlContent,
+        });
+        console.log(`[EMAIL-GMAIL-SMTP] ✅ OTP dispatched to ${email} (MsgID: ${info.messageId})`);
+        return true;
+      } catch (err: any) {
+        console.error(`[EMAIL-GMAIL-SMTP] ❌ Failed: ${err.message}`);
+      }
+    }
+
+    // 3. No transporter worked — log OTP to console (dev/fallback)
+    this.logConsoleOtp(email, username, otp, expiryMinutes);
+    return false;
   }
 
   /**
-   * Send password recovery email via SMTP
+   * Send password recovery email
    */
   static async sendPasswordResetEmail(email: string, resetUrl: string): Promise<boolean> {
-    const transporter = this.getTransporter();
+    this.initTransporters();
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -405,54 +429,51 @@ If you did not sign up for UdtaBirdie, please ignore this email.
 </html>
 `;
 
-    const textContent = `
-UdtaBirdie Socials - Password Reset
+    const textContent = `UdtaBirdie Socials - Password Reset
 
-A password reset was requested for your account. Please use the following link to reset your password:
+A password reset was requested for your account. Reset link:
 ${resetUrl}
 
-This link is valid for 1 hour. If you did not request this, please ignore this email.
-`;
+This link is valid for 1 hour. If you did not request this, ignore this email.`;
 
-    // 1. Try Resend HTTP API first
-    const resendOk = await this.sendViaResend(
-      email,
-      'Reset your UdtaBirdie password',
-      htmlContent,
-      textContent,
-    );
-    if (resendOk) return true;
+    const subject = 'Reset your UdtaBirdie password';
 
-    // 2. Try Brevo as secondary
-    const brevoOk = await this.sendViaBrevo(
-      email,
-      'Reset your UdtaBirdie password',
-      htmlContent,
-      textContent,
-    );
-    if (brevoOk) return true;
-
-    // 2. Fall back to SMTP
-    if (transporter) {
+    // 1. PRIMARY: Brevo SMTP relay
+    if (this.brevoTransporter) {
       try {
-        const info = await transporter.sendMail({
-          from: this.getSenderAddress(),
+        const info = await this.brevoTransporter.sendMail({
+          from: this.getBrevoSender(),
           to: email,
-          subject: 'Reset your UdtaBirdie password',
+          subject,
           text: textContent,
           html: htmlContent,
         });
-        console.log(`[EMAIL] Password reset email dispatched to ${email} (MessageID: ${info.messageId})`);
+        console.log(`[EMAIL-BREVO-SMTP] ✅ Password reset dispatched to ${email} (MsgID: ${info.messageId})`);
         return true;
       } catch (err: any) {
-        console.error(`[EMAIL] Failed to send reset email to ${email}:`, err.message);
-        console.log(`[SECURITY/DEV] Password reset link for ${email}: ${resetUrl}`);
-        return false;
+        console.error(`[EMAIL-BREVO-SMTP] ❌ Failed: ${err.message}`);
       }
-    } else {
-      console.log(`[SECURITY/DEV] Password reset link for ${email}: ${resetUrl}`);
-      return true;
     }
+
+    // 2. FALLBACK: Gmail SMTP
+    if (this.gmailTransporter) {
+      try {
+        const info = await this.gmailTransporter.sendMail({
+          from: this.getGmailSender(),
+          to: email,
+          subject,
+          text: textContent,
+          html: htmlContent,
+        });
+        console.log(`[EMAIL-GMAIL-SMTP] ✅ Password reset dispatched to ${email} (MsgID: ${info.messageId})`);
+        return true;
+      } catch (err: any) {
+        console.error(`[EMAIL-GMAIL-SMTP] ❌ Failed: ${err.message}`);
+      }
+    }
+
+    console.log(`[SECURITY/DEV] Password reset link for ${email}: ${resetUrl}`);
+    return false;
   }
 
   private static logConsoleOtp(email: string, username: string, otp: string, expiryMinutes: number): void {
