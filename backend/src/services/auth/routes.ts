@@ -102,7 +102,38 @@ function sanitizeInput(input: string): string {
   return input.trim().replace(/[<>]/g, '');
 }
 
-// GET /auth/smtp-status (safe diagnostic endpoint for SMTP)
+// GET /auth/email-status — safe diagnostic showing which email providers are configured
+router.get('/email-status', (_req: Request, res: Response) => {
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpHost = process.env.SMTP_HOST;
+  const resendKey = process.env.RESEND_API_KEY || process.env.RESEND_KEY || '';
+  const resendFrom = process.env.RESEND_FROM_EMAIL || smtpUser || '';
+  const brevoKey = process.env.BREVO_API_KEY || '';
+  const brevoFrom = process.env.BREVO_FROM_EMAIL || smtpUser || '';
+
+  res.json({
+    resend: {
+      configured: !!resendKey,
+      keyMasked: resendKey ? `${resendKey.substring(0, 8)}...${resendKey.slice(-4)}` : 'NOT SET',
+      fromEmail: resendFrom || 'NOT SET — add RESEND_FROM_EMAIL to Render env vars',
+      note: 'Must match the email you signed up to Resend with',
+    },
+    brevo: {
+      configured: !!brevoKey,
+      keyMasked: brevoKey ? `${brevoKey.substring(0, 8)}...${brevoKey.slice(-4)}` : 'NOT SET',
+      fromEmail: brevoFrom || 'NOT SET',
+    },
+    smtp: {
+      configured: !!(smtpHost && smtpUser && smtpPass),
+      host: smtpHost || 'NOT SET',
+      user: smtpUser ? `${smtpUser.substring(0, 3)}***@${smtpUser.split('@')[1] || ''}` : 'NOT SET',
+    },
+    sendOrder: 'Resend → Brevo → SMTP (first success wins)',
+  });
+});
+
+// GET /auth/smtp-status (legacy alias — kept for backwards compatibility)
 router.get('/smtp-status', (_req: Request, res: Response) => {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
@@ -119,7 +150,6 @@ router.get('/smtp-status', (_req: Request, res: Response) => {
     resend: {
       configured: !!resendKey,
       keyMasked: resendKey ? `${resendKey.substring(0, 6)}...${resendKey.slice(-4)}` : 'none',
-      from: process.env.RESEND_FROM || 'UdtaBirdie <onboarding@resend.dev>',
     },
   });
 });

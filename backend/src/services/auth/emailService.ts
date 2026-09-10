@@ -70,10 +70,61 @@ export class EmailService {
   }
 
   /**
-   * Try sending email via Resend HTTP API (port 443 — never blocked by Render/cloud firewalls).
-   * Resend free tier: only allows sending TO the account owner email unless a custom domain is verified.
-   * With 'onboarding@resend.dev' as sender, any recipient works in test mode up to 100 emails/day.
+   * Send email via Resend HTTP API (port 443 — never blocked by Render/cloud firewalls).
+   * Resend free tier: 100 emails/day. Works with any recipient when sending FROM the account owner email.
+   * Set RESEND_FROM_EMAIL to the email address you signed up to Resend with.
    */
+  private static async sendViaResend(to: string, subject: string, html: string, text: string): Promise<boolean> {
+    const apiKey = (process.env.RESEND_API_KEY || process.env.RESEND_KEY || '').replace(/["'\s]/g, '');
+    if (!apiKey) {
+      console.log('[EMAIL-RESEND] No RESEND_API_KEY configured, skipping.');
+      return false;
+    }
+
+    // Use the account email as the sender (this is what Resend allows on free tier)
+    const fromEmail = (
+      process.env.RESEND_FROM_EMAIL ||
+      process.env.SMTP_USER ||
+      ''
+    ).replace(/["'\s]/g, '');
+    const fromName = (process.env.RESEND_FROM_NAME || 'UdtaBirdie').replace(/["']/g, '');
+
+    if (!fromEmail) {
+      console.error('[EMAIL-RESEND] ❌ No sender email configured. Set RESEND_FROM_EMAIL in your Render environment variables.');
+      return false;
+    }
+
+    const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
+    try {
+      console.log(`[EMAIL-RESEND] Attempting Resend dispatch from=${from} to=${to}...`);
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from,
+          to: [to],
+          subject,
+          html,
+          text,
+        }),
+      });
+      const data: any = await res.json().catch(() => ({}));
+      if (res.ok && data.id) {
+        console.log(`[EMAIL-RESEND] ✅ Delivered! Email ID: ${data.id}`);
+        return true;
+      }
+      console.error(`[EMAIL-RESEND] ❌ Error ${res.status}:`, JSON.stringify(data));
+      return false;
+    } catch (err: any) {
+      console.error('[EMAIL-RESEND] ❌ Request failed:', err.message);
+      return false;
+    }
+  }
+
   /**
    * Send email via Brevo (formerly Sendinblue) HTTP API.
    * Works on Render/cloud (port 443, never blocked).
@@ -82,7 +133,10 @@ export class EmailService {
    */
   private static async sendViaBrevo(to: string, subject: string, html: string, text: string): Promise<boolean> {
     const apiKey = (process.env.BREVO_API_KEY || '').replace(/["'\s]/g, '');
-    if (!apiKey) return false;
+    if (!apiKey) {
+      console.log('[EMAIL-BREVO] No BREVO_API_KEY configured, skipping.');
+      return false;
+    }
 
     const fromEmail = (process.env.BREVO_FROM_EMAIL || process.env.SMTP_USER || '').replace(/["'\s]/g, '');
     const fromName = (process.env.BREVO_FROM_NAME || 'UdtaBirdie').replace(/["']/g, '');
@@ -280,14 +334,23 @@ Security Notice: Never share this code with anyone. UdtaBirdie staff will never 
 If you did not sign up for UdtaBirdie, please ignore this email.
 `;
 
-    // 1. Try Resend HTTP API first (bypasses Render/cloud SMTP port blocks)
-    const resendOk = await this.sendViaBrevo(
+    // 1. Try Resend HTTP API first (port 443, works on Render, free 100/day)
+    const resendOk = await this.sendViaResend(
       email,
       `${otp} is your UdtaBirdie verification code`,
       htmlContent,
       textContent,
     );
     if (resendOk) return true;
+
+    // 2. Try Brevo as secondary (port 443, works on Render, free 300/day)
+    const brevoOk = await this.sendViaBrevo(
+      email,
+      `${otp} is your UdtaBirdie verification code`,
+      htmlContent,
+      textContent,
+    );
+    if (brevoOk) return true;
 
     // 2. Fall back to SMTP
     if (transporter) {
@@ -350,13 +413,22 @@ This link is valid for 1 hour. If you did not request this, please ignore this e
 `;
 
     // 1. Try Resend HTTP API first
-    const resendOk = await this.sendViaBrevo(
+    const resendOk = await this.sendViaResend(
       email,
       'Reset your UdtaBirdie password',
       htmlContent,
       textContent,
     );
     if (resendOk) return true;
+
+    // 2. Try Brevo as secondary
+    const brevoOk = await this.sendViaBrevo(
+      email,
+      'Reset your UdtaBirdie password',
+      htmlContent,
+      textContent,
+    );
+    if (brevoOk) return true;
 
     // 2. Fall back to SMTP
     if (transporter) {

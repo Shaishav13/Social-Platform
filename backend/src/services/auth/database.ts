@@ -94,6 +94,15 @@ export class AuthDatabase {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP WITH TIME ZONE;
     `;
 
+    // One-time migration: accounts created BEFORE the email-verification system was introduced
+    // will have is_verified = NULL. Treat those as verified so existing users can still log in.
+    const migrateExistingUsers = `
+      UPDATE users
+      SET is_verified = true,
+          email_verified_at = COALESCE(email_verified_at, created_at)
+      WHERE is_verified IS NULL OR is_verified = false AND email_verified_at IS NOT NULL;
+    `;
+
     await DatabaseConnection.query(createUsersTable);
     await DatabaseConnection.query(alterUsersTable);
     await DatabaseConnection.query(createSessionsTable);
@@ -101,6 +110,14 @@ export class AuthDatabase {
     await DatabaseConnection.query(createEmailVerificationsTable);
     await DatabaseConnection.query(createIndexes);
     await DatabaseConnection.query(createUpdatedAtTrigger);
+
+    // Run migration silently (won't affect users who are genuinely unverified/new)
+    try {
+      await DatabaseConnection.query(migrateExistingUsers);
+      console.log('[AUTH-DB] Legacy user migration completed (NULL is_verified → true for pre-verification accounts)');
+    } catch (migErr) {
+      console.warn('[AUTH-DB] Legacy user migration skipped:', migErr);
+    }
   }
 
   static async findUserByEmail(email: string): Promise<User | null> {
