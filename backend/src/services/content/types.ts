@@ -53,13 +53,19 @@ export interface MediaUploadResult {
 }
 
 export interface FileStorageConfig {
-  type: 'local' | 's3';
+  type: 'local' | 's3' | 'cloudinary';
   localPath?: string;
   s3Config?: {
     bucket: string;
     region: string;
     accessKeyId: string;
     secretAccessKey: string;
+  };
+  cloudinaryConfig?: {
+    cloudName?: string;
+    apiKey?: string;
+    apiSecret?: string;
+    url?: string;
   };
 }
 

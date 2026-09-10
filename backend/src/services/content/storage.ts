@@ -2,20 +2,66 @@ import { FileStorageConfig, MediaUploadResult } from './types';
 import path from 'path';
 import * as fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+import { v2 as cloudinary } from 'cloudinary';
 
 export class FileStorageService {
   private config: FileStorageConfig;
 
   constructor(config?: FileStorageConfig) {
+    const hasCloudinary = this.checkCloudinaryConfig();
     this.config = config || {
-      type: 'local',
+      type: hasCloudinary ? 'cloudinary' : 'local',
       localPath: process.env.UPLOAD_PATH || './uploads'
     };
+    if (hasCloudinary) {
+      this.initCloudinary();
+    }
+  }
+
+  private checkCloudinaryConfig(): boolean {
+    const url = process.env.CLOUDINARY_URL?.trim();
+    if (url && !url.includes('***')) {
+      return true;
+    }
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+    const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+    const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
+    return !!(cloudName && apiKey && apiSecret && !apiSecret.includes('***'));
+  }
+
+  private initCloudinary(): void {
+    const url = process.env.CLOUDINARY_URL?.trim();
+    if (url && !url.includes('***')) {
+      cloudinary.config({
+        cloudinary_url: url,
+        secure: true
+      });
+      console.log('☁️ Cloudinary storage configured via CLOUDINARY_URL');
+      return;
+    }
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+    const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+    const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
+
+    if (cloudName && apiKey && apiSecret) {
+      cloudinary.config({
+        cloud_name: cloudName,
+        api_key: apiKey,
+        api_secret: apiSecret,
+        secure: true
+      });
+      console.log(`☁️ Cloudinary storage configured for cloud: ${cloudName}`);
+    }
   }
 
   async initialize(): Promise<void> {
-    if (this.config.type === 'local' && this.config.localPath) {
-      // Ensure upload directory exists
+    if (this.checkCloudinaryConfig()) {
+      this.initCloudinary();
+    }
+
+    if (this.config.localPath) {
+      // Ensure local upload directory exists as fallback or default
       try {
         await fs.access(this.config.localPath);
       } catch {
@@ -54,6 +100,16 @@ export class FileStorageService {
 
     const filename = `${uuidv4()}${ext}`;
     
+    // If Cloudinary is configured or explicitly selected, upload to Cloud CDN
+    if (this.checkCloudinaryConfig() || this.config.type === 'cloudinary') {
+      try {
+        return await this.saveFileToCloudinary(buffer, filename, mimeType);
+      } catch (error) {
+        console.error('❌ Cloudinary upload failed, falling back to local storage:', error);
+        return this.saveFileLocally(buffer, filename, mimeType);
+      }
+    }
+
     if (this.config.type === 'local') {
       return this.saveFileLocally(buffer, filename, mimeType);
     } else if (this.config.type === 's3') {
@@ -61,6 +117,39 @@ export class FileStorageService {
     }
     
     throw new Error(`Unsupported storage type: ${this.config.type}`);
+  }
+
+  private async saveFileToCloudinary(
+    buffer: Buffer,
+    filename: string,
+    mimeType: string
+  ): Promise<{ filename: string; url: string }> {
+    return new Promise((resolve, reject) => {
+      const isVideo = mimeType.startsWith('video/');
+      const resourceType: 'image' | 'video' | 'raw' = isVideo ? 'video' : 'image';
+      const cleanName = path.parse(filename).name;
+
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'udtabirdie/posts',
+          resource_type: resourceType,
+          public_id: cleanName,
+          overwrite: true
+        },
+        (error, result) => {
+          if (error || !result) {
+            console.error('[Cloudinary] Upload stream error:', error);
+            return reject(error || new Error('Cloudinary upload stream failed'));
+          }
+          resolve({
+            filename: result.public_id,
+            url: result.secure_url
+          });
+        }
+      );
+
+      uploadStream.end(buffer);
+    });
   }
 
   private async saveFileLocally(
@@ -96,10 +185,19 @@ export class FileStorageService {
   ): Promise<{ filename: string; url: string }> {
     // S3 implementation would go here
     // For now, throw an error as S3 SDK is not installed
-    throw new Error('S3 storage not implemented yet. Please use local storage.');
+    throw new Error('S3 storage not implemented yet. Please use local storage or Cloudinary.');
   }
 
   async deleteFile(filename: string): Promise<void> {
+    if (filename.startsWith('udtabirdie/') || this.checkCloudinaryConfig()) {
+      try {
+        await cloudinary.uploader.destroy(filename);
+        return;
+      } catch (err) {
+        console.warn('Cloudinary delete failed, trying local fallback:', err);
+      }
+    }
+
     if (this.config.type === 'local') {
       await this.deleteFileLocally(filename);
     } else if (this.config.type === 's3') {
