@@ -23,30 +23,37 @@ export class EmailService {
     // The BREVO_API_KEY env var starting with "xsmtpsib-" IS a Brevo SMTP password.
     // Brevo SMTP relay (smtp-relay.brevo.com:587) works from Render (port never blocked),
     // sends to ANY recipient, and doesn't need a verified custom domain.
-    // Login username = the Brevo account email (BREVO_FROM_EMAIL or SMTP_USER).
+    // SMTP login username = your Brevo ACCOUNT email (top-right in Brevo dashboard).
+    // This may differ from the sender address. Set BREVO_SMTP_USER to override.
     const brevoKey = (process.env.BREVO_API_KEY || '').replace(/["'\s]/g, '');
-    const brevoEmail = (process.env.BREVO_FROM_EMAIL || process.env.SMTP_USER || '').replace(/["'\s]/g, '');
+    const brevoSmtpUser = (
+      process.env.BREVO_SMTP_USER ||   // Explicit Brevo account email override
+      process.env.BREVO_FROM_EMAIL ||   // Sender email (usually same as account email)
+      process.env.SMTP_USER ||          // Gmail fallback
+      ''
+    ).replace(/["'\s]/g, '');
 
-    if (brevoKey && brevoEmail) {
+    if (brevoKey && brevoSmtpUser) {
       try {
         this.brevoTransporter = nodemailer.createTransport({
           host: 'smtp-relay.brevo.com',
           port: 587,
           secure: false,     // STARTTLS
           family: 4,         // Force IPv4 — avoid ENETUNREACH on Render
-          auth: { user: brevoEmail, pass: brevoKey },
+          auth: { user: brevoSmtpUser, pass: brevoKey },
           connectionTimeout: 12000,
           greetingTimeout: 12000,
           socketTimeout: 15000,
           tls: { rejectUnauthorized: false, minVersion: 'TLSv1.2' },
         } as any);
-        console.log(`[EMAIL] ☁️ Brevo SMTP transporter ready (smtp-relay.brevo.com:587) for ${brevoEmail}`);
+        console.log(`[EMAIL] ☁️ Brevo SMTP ready → smtp-relay.brevo.com:587 (login: ${brevoSmtpUser})`);
       } catch (err) {
         console.error('[EMAIL] Failed to initialize Brevo SMTP transporter:', err);
         this.brevoTransporter = null;
       }
     } else {
-      console.log('[EMAIL] Brevo SMTP not configured (need BREVO_API_KEY + BREVO_FROM_EMAIL).');
+      if (!brevoKey) console.log('[EMAIL] Brevo SMTP skipped: BREVO_API_KEY not set.');
+      else console.log('[EMAIL] Brevo SMTP skipped: no login email (set BREVO_SMTP_USER or BREVO_FROM_EMAIL).');
     }
 
     // ── Gmail SMTP fallback ──────────────────────────────────────────────────
