@@ -2,7 +2,30 @@ import { FileStorageConfig, MediaUploadResult } from './types';
 import path from 'path';
 import * as fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
-import { v2 as cloudinary } from 'cloudinary';
+function getCloudinaryInstance(): any {
+  if (process.env.CLOUDINARY_URL) {
+    let raw = process.env.CLOUDINARY_URL.trim().replace(/^["']+|["']+$/g, '');
+    if (raw.startsWith('CLOUDINARY_URL=')) {
+      raw = raw.substring('CLOUDINARY_URL='.length).trim().replace(/^["']+|["']+$/g, '');
+    }
+    const match = raw.match(/cloudinary:\/\/[^\s"']+/);
+    if (match) {
+      process.env.CLOUDINARY_URL = match[0];
+    } else {
+      console.warn('⚠️ [Storage] Invalid CLOUDINARY_URL format. Unsetting to avoid crash. Raw was:', raw);
+      delete process.env.CLOUDINARY_URL;
+    }
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const cloudinary = require('cloudinary').v2;
+    return cloudinary;
+  } catch (err) {
+    console.error('⚠️ Could not load cloudinary module:', err);
+    return null;
+  }
+}
 
 export class FileStorageService {
   private config: FileStorageConfig;
@@ -20,7 +43,7 @@ export class FileStorageService {
 
   private checkCloudinaryConfig(): boolean {
     const url = process.env.CLOUDINARY_URL?.trim();
-    if (url && !url.includes('***')) {
+    if (url && (url.startsWith('cloudinary://') || url.includes('cloudinary://')) && !url.includes('***')) {
       return true;
     }
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
@@ -30,14 +53,21 @@ export class FileStorageService {
   }
 
   private initCloudinary(): void {
+    const cloudinary = getCloudinaryInstance();
+    if (!cloudinary) return;
+
     const url = process.env.CLOUDINARY_URL?.trim();
     if (url && !url.includes('***')) {
-      cloudinary.config({
-        cloudinary_url: url,
-        secure: true
-      });
-      console.log('☁️ Cloudinary storage configured via CLOUDINARY_URL');
-      return;
+      try {
+        cloudinary.config({
+          cloudinary_url: url,
+          secure: true
+        });
+        console.log('☁️ Cloudinary storage configured via CLOUDINARY_URL');
+        return;
+      } catch (err) {
+        console.warn('⚠️ Failed to config Cloudinary with CLOUDINARY_URL:', err);
+      }
     }
 
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
@@ -45,13 +75,17 @@ export class FileStorageService {
     const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
 
     if (cloudName && apiKey && apiSecret) {
-      cloudinary.config({
-        cloud_name: cloudName,
-        api_key: apiKey,
-        api_secret: apiSecret,
-        secure: true
-      });
-      console.log(`☁️ Cloudinary storage configured for cloud: ${cloudName}`);
+      try {
+        cloudinary.config({
+          cloud_name: cloudName,
+          api_key: apiKey,
+          api_secret: apiSecret,
+          secure: true
+        });
+        console.log(`☁️ Cloudinary storage configured for cloud: ${cloudName}`);
+      } catch (err) {
+        console.warn('⚠️ Failed to config Cloudinary with credentials:', err);
+      }
     }
   }
 
@@ -124,6 +158,11 @@ export class FileStorageService {
     filename: string,
     mimeType: string
   ): Promise<{ filename: string; url: string }> {
+    const cloudinary = getCloudinaryInstance();
+    if (!cloudinary) {
+      throw new Error('Cloudinary SDK unavailable');
+    }
+
     return new Promise((resolve, reject) => {
       const isVideo = mimeType.startsWith('video/');
       const resourceType: 'image' | 'video' | 'raw' = isVideo ? 'video' : 'image';
@@ -136,7 +175,7 @@ export class FileStorageService {
           public_id: cleanName,
           overwrite: true
         },
-        (error, result) => {
+        (error: any, result: any) => {
           if (error || !result) {
             console.error('[Cloudinary] Upload stream error:', error);
             return reject(error || new Error('Cloudinary upload stream failed'));
@@ -191,8 +230,11 @@ export class FileStorageService {
   async deleteFile(filename: string): Promise<void> {
     if (filename.startsWith('udtabirdie/') || this.checkCloudinaryConfig()) {
       try {
-        await cloudinary.uploader.destroy(filename);
-        return;
+        const cloudinary = getCloudinaryInstance();
+        if (cloudinary) {
+          await cloudinary.uploader.destroy(filename);
+          return;
+        }
       } catch (err) {
         console.warn('Cloudinary delete failed, trying local fallback:', err);
       }

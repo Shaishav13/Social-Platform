@@ -9,6 +9,7 @@
  * GitHub: https://github.com/Shaishav13
  */
 
+import './config/preboot';
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
