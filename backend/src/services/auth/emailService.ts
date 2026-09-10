@@ -86,6 +86,47 @@ export class EmailService {
     }
   }
 
+  // ── Brevo REST API (Port 443 — works on Render Free) ──────────────────────
+  // Requires an API key starting with 'xkeysib-' (not an SMTP password).
+  private static async sendViaBrevoRest(to: string, subject: string, html: string, text: string): Promise<boolean> {
+    const apiKey = (process.env.BREVO_API_KEY || '').replace(/["'\s]/g, '');
+    // Only attempt REST if key starts with xkeysib- (Brevo API key format)
+    if (!apiKey.startsWith('xkeysib-')) {
+      return false;
+    }
+
+    const fromEmail = (process.env.BREVO_FROM_EMAIL || process.env.SMTP_USER || '').replace(/["'\s]/g, '');
+    const fromName = (process.env.BREVO_FROM_NAME || 'UdtaBirdie').replace(/["']/g, '');
+
+    try {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          sender: { name: fromName, email: fromEmail },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+          textContent: text,
+        }),
+      });
+      const data: any = await res.json().catch(() => ({}));
+      if (res.ok && data.messageId) {
+        console.log(`[EMAIL-BREVO-REST] ✅ Delivered to ${to} (Message ID: ${data.messageId})`);
+        return true;
+      }
+      console.error(`[EMAIL-BREVO-REST] ❌ Error ${res.status}:`, data.message || JSON.stringify(data));
+      return false;
+    } catch (err: any) {
+      console.error('[EMAIL-BREVO-REST] ❌ Request failed:', err.message);
+      return false;
+    }
+  }
+
   private static getBrevoSender(): string {
     const email = (process.env.BREVO_FROM_EMAIL || process.env.SMTP_USER || '').replace(/["'\s]/g, '');
     const name = (process.env.BREVO_FROM_NAME || 'UdtaBirdie').replace(/["']/g, '');
@@ -368,7 +409,12 @@ If you did not sign up for UdtaBirdie, please ignore this email.
 
     const subject = `${otp} is your UdtaBirdie verification code`;
 
-    // 1. PRIMARY: Brevo SMTP relay (smtp-relay.brevo.com:587)
+    // 0. PRIMARY REST API: Brevo (port 443, works on Render, requires xkeysib- key)
+    if (await this.sendViaBrevoRest(email, subject, htmlContent, textContent)) {
+      return true;
+    }
+
+    // 1. SECONDARY: Brevo SMTP relay (smtp-relay.brevo.com:587)
     //    Uses xsmtpsib- key as SMTP password. Works on Render. Sends to any email.
     if (this.brevoTransporter) {
       try {
@@ -445,7 +491,12 @@ This link is valid for 1 hour. If you did not request this, ignore this email.`;
 
     const subject = 'Reset your UdtaBirdie password';
 
-    // 1. PRIMARY: Brevo SMTP relay
+    // 0. PRIMARY REST API: Brevo (port 443, works on Render, requires xkeysib- key)
+    if (await this.sendViaBrevoRest(email, subject, htmlContent, textContent)) {
+      return true;
+    }
+
+    // 1. SECONDARY: Brevo SMTP relay
     if (this.brevoTransporter) {
       try {
         const info = await this.brevoTransporter.sendMail({
