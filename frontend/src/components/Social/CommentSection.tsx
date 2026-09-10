@@ -22,6 +22,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const highlightedCommentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -242,9 +243,29 @@ const CommentSection: React.FC<CommentSectionProps> = ({
       {/* Nested Replies */}
       {comment.replies && comment.replies.length > 0 && (
         <div className="replies-container">
-          {comment.replies.map(reply => (
+          {comment.replies.slice(0, expandedReplies[comment.id] ? undefined : 3).map(reply => (
             <CommentItem key={reply.id} comment={reply} isReply={true} />
           ))}
+          {!expandedReplies[comment.id] && comment.replies.length > 3 && (
+            <button 
+              className="view-more-replies-btn"
+              onClick={() => setExpandedReplies(prev => ({ ...prev, [comment.id]: true }))}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--ink-500)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '4px 0',
+                marginTop: '4px',
+                fontFamily: 'var(--font-sans)',
+                textAlign: 'left'
+              }}
+            >
+              ---- View {comment.replies.length - 3} more replies
+            </button>
+          )}
         </div>
       )}
     </div>

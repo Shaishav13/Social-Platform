@@ -151,6 +151,7 @@ const PostDetail: React.FC = () => {
           <div className="post-comments-section">
             <CommentSection 
               postId={post.id}
+              currentUser={user || undefined}
               highlightCommentId={commentId}
             />
           </div>

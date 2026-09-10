@@ -35,6 +35,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const { user: authUser } = useAuth();
@@ -368,124 +369,82 @@ export const PostCard: React.FC<PostCardProps> = ({
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21 15 16 10 5 21" />
               </svg>
-              <span>{mediaUrls.length}</span>
+              <span>{currentMediaIndex + 1}/{mediaUrls.length}</span>
             </div>
           )}
 
-          {/* 1 Item Layout */}
-          {mediaUrls.length === 1 && (
-            <div
-              onClick={(e) => handleMediaClick(0, e)}
-              style={{ cursor: 'pointer', position: 'relative', width: '100%', maxHeight: '520px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              title="Click to view full size"
+          {/* Carousel Arrows */}
+          {mediaUrls.length > 1 && currentMediaIndex > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setCurrentMediaIndex(prev => prev - 1); }}
+              style={{
+                position: 'absolute',
+                left: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 5,
+                backgroundColor: 'rgba(28, 26, 24, 0.75)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
             >
-              {mediaUrls[0].match(/\.(mp4|webm|mov)$/i) ? (
-                <video src={resolveMediaUrl(mediaUrls[0])} controls preload="metadata" style={{ width: '100%', maxHeight: '520px', objectFit: 'contain' }} />
-              ) : (
-                <img
-                  src={resolveMediaUrl(mediaUrls[0])}
-                  alt="Letter attachment"
-                  loading="lazy"
-                  style={{ width: '100%', maxHeight: '520px', objectFit: 'contain', display: 'block', transition: 'transform 0.2s ease' }}
-                />
-              )}
-            </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6"/>
+              </svg>
+            </button>
           )}
 
-          {/* 2 Items Layout */}
-          {mediaUrls.length === 2 && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px', height: '320px', width: '100%' }}>
-              {mediaUrls.map((url, idx) => (
-                <div
-                  key={idx}
-                  onClick={(e) => handleMediaClick(idx, e)}
-                  style={{ cursor: 'pointer', position: 'relative', height: '100%', overflow: 'hidden' }}
-                  title={`View attachment ${idx + 1}`}
-                >
-                  {url.match(/\.(mp4|webm|mov)$/i) ? (
-                    <video src={resolveMediaUrl(url)} preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : (
-                    <img src={resolveMediaUrl(url)} alt={`Attachment ${idx + 1}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  )}
-                </div>
-              ))}
-            </div>
+          {mediaUrls.length > 1 && currentMediaIndex < mediaUrls.length - 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setCurrentMediaIndex(prev => prev + 1); }}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 5,
+                backgroundColor: 'rgba(28, 26, 24, 0.75)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </button>
           )}
 
-          {/* 3 Items Layout */}
-          {mediaUrls.length === 3 && (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '3px', height: '340px', width: '100%' }}>
-              <div
-                onClick={(e) => handleMediaClick(0, e)}
-                style={{ cursor: 'pointer', position: 'relative', height: '100%', overflow: 'hidden' }}
-                title="View attachment 1"
-              >
-                {mediaUrls[0].match(/\.(mp4|webm|mov)$/i) ? (
-                  <video src={resolveMediaUrl(mediaUrls[0])} preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <img src={resolveMediaUrl(mediaUrls[0])} alt="Attachment 1" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                )}
-              </div>
-              <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: '3px', height: '100%' }}>
-                {mediaUrls.slice(1, 3).map((url, idx) => (
-                  <div
-                    key={idx + 1}
-                    onClick={(e) => handleMediaClick(idx + 1, e)}
-                    style={{ cursor: 'pointer', position: 'relative', height: '100%', overflow: 'hidden' }}
-                    title={`View attachment ${idx + 2}`}
-                  >
-                    {url.match(/\.(mp4|webm|mov)$/i) ? (
-                      <video src={resolveMediaUrl(url)} preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <img src={resolveMediaUrl(url)} alt={`Attachment ${idx + 2}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 4 or More Items Layout */}
-          {mediaUrls.length >= 4 && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: '3px', height: '340px', width: '100%' }}>
-              {mediaUrls.slice(0, 4).map((url, idx) => {
-                const isFourthAndMore = idx === 3 && mediaUrls.length > 4;
-                return (
-                  <div
-                    key={idx}
-                    onClick={(e) => handleMediaClick(idx, e)}
-                    style={{ cursor: 'pointer', position: 'relative', height: '100%', overflow: 'hidden' }}
-                    title={`View attachment ${idx + 1}`}
-                  >
-                    {url.match(/\.(mp4|webm|mov)$/i) ? (
-                      <video src={resolveMediaUrl(url)} preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <img src={resolveMediaUrl(url)} alt={`Attachment ${idx + 1}`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    )}
-                    {isFourthAndMore && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          backgroundColor: 'rgba(20, 18, 16, 0.65)',
-                          backdropFilter: 'blur(3px)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#FAF8F5',
-                          fontSize: '22px',
-                          fontWeight: 700,
-                          fontFamily: 'var(--font-sans)',
-                        }}
-                      >
-                        +{mediaUrls.length - 4}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* Current Media */}
+          <div
+            onClick={(e) => handleMediaClick(currentMediaIndex, e)}
+            style={{ cursor: 'pointer', position: 'relative', width: '100%', maxHeight: '520px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Click to view full size"
+          >
+            {mediaUrls[currentMediaIndex].match(/\.(mp4|webm|mov)$/i) ? (
+              <video src={resolveMediaUrl(mediaUrls[currentMediaIndex])} controls preload="metadata" style={{ width: '100%', maxHeight: '520px', objectFit: 'contain' }} />
+            ) : (
+              <img
+                src={resolveMediaUrl(mediaUrls[currentMediaIndex])}
+                alt={`Attachment ${currentMediaIndex + 1}`}
+                loading="lazy"
+                style={{ width: '100%', maxHeight: '520px', objectFit: 'contain', display: 'block', transition: 'transform 0.2s ease' }}
+              />
+            )}
+          </div>
         </div>
       )}
 
