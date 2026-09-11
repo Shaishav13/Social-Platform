@@ -9,23 +9,26 @@ const CreatePostPage: React.FC = () => {
   };
 
   return (
-    <div className="wren-compose-page">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+    <div style={{ maxWidth: '720px', margin: '40px auto', padding: '0 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+        <h1 className="type-display-l" style={{ margin: 0 }}>Compose</h1>
         <button
           onClick={() => navigate(-1)}
-          className="wren-btn wren-btn-secondary"
-          style={{ padding: '6px 12px', minHeight: '34px', fontSize: '13px' }}
-          title="Go back"
+          className="wren-btn wren-btn-ghost"
+          style={{ padding: '8px 16px', fontSize: '14px', color: 'var(--ink-600)' }}
+          title="Cancel"
         >
-          ← Back
+          Cancel
         </button>
-        <h1 className="type-display-m">New Letter</h1>
       </div>
 
-      <ComposeLetter
-        onPostCreated={handlePostCreated}
-        placeholder="Write a letter to your readers. Take your time..."
-      />
+      <div className="wren-card" style={{ padding: '0', overflow: 'hidden' }}>
+        <ComposeLetter
+          onPostCreated={handlePostCreated}
+          placeholder="Write your letter, essay, or thoughts here. Take your time..."
+          isStandalone={true}
+        />
+      </div>
     </div>
   );
 };

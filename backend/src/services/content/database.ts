@@ -435,6 +435,20 @@ export class ContentDatabase {
         query += ` AND p.is_public = true`;
       }
       
+      // Filter out NSFW posts for viewers who are not opted in
+      if (options.viewerId) {
+        query += `
+          AND (
+            u.is_18_plus = false
+            OR (SELECT is_18_plus FROM users WHERE id = $${paramCount++}) = true
+            OR u.id = $${paramCount++}
+          )
+        `;
+        params.push(options.viewerId, options.viewerId);
+      } else {
+        query += ` AND u.is_18_plus = false`;
+      }
+      
       query += `
         ORDER BY p.created_at DESC
         LIMIT $${paramCount++} OFFSET $${paramCount++}
@@ -475,6 +489,7 @@ export class ContentDatabase {
         JOIN users u ON p.author_id = u.id
         WHERE p.is_public = true
           AND u.is_private = false
+          AND u.is_18_plus = false
           AND p.created_at > NOW() - INTERVAL '7 days'
         ORDER BY (p.like_count + p.comment_count + p.share_count) DESC, p.created_at DESC
         LIMIT $1
@@ -618,6 +633,20 @@ export class ContentDatabase {
       } else {
         // Not authenticated - only show posts from public accounts
         query += ` AND u.is_private = false`;
+      }
+      
+      // Filter out NSFW posts for users who are not opted in
+      if (options.userId) {
+        query += `
+          AND (
+            u.is_18_plus = false
+            OR (SELECT is_18_plus FROM users WHERE id = $${paramCount++}) = true
+            OR u.id = $${paramCount++}
+          )
+        `;
+        params.push(options.userId, options.userId);
+      } else {
+        query += ` AND u.is_18_plus = false`;
       }
       
       query += `

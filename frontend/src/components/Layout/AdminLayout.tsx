@@ -14,10 +14,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
-  // Persist sidebar state in localStorage, defaulting to true on wide screens
+  // Persist sidebar state in localStorage, defaulting to true only on wide screens
   const [isExpanded, setIsExpanded] = useState<boolean>(() => {
     const saved = localStorage.getItem('wren_admin_sidebar_expanded');
-    return saved !== null ? saved === 'true' : window.innerWidth >= 1200;
+    if (saved !== null) return saved === 'true';
+    return window.innerWidth >= 900; // collapsed by default on tablet/phone
   });
 
   const handleToggle = () => {
@@ -55,6 +56,21 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </div>
 
           <div className="wren-admin-topbar__right">
+            {/* Hamburger toggle — visible on mobile (≤900px) */}
+            <button
+              type="button"
+              onClick={handleToggle}
+              className="wren-admin-action-btn wren-admin-hamburger"
+              title="Toggle Sidebar"
+              aria-label="Toggle Sidebar"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+
             {/* Theme toggle */}
             <button
               type="button"

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
+import { Icon } from '../components/ui';
 
 const EditProfile: React.FC = () => {
   const { user, updateUser } = useAuth();
@@ -177,7 +178,7 @@ const EditProfile: React.FC = () => {
     return (
       <div style={{ maxWidth: '480px', margin: '60px auto 0', padding: '0 16px' }}>
         <div className="wren-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '16px' }}>🔐</div>
+          <div style={{ display: 'flex', justifyContent: 'center', color: 'var(--ink-500)', marginBottom: '16px' }}><Icon name="lock" size={32} /></div>
           <h2 className="type-display-m" style={{ marginBottom: '8px' }}>Authentication Required</h2>
           <p className="type-ui-m" style={{ color: 'var(--ink-600)', marginBottom: '24px' }}>
             Please log in to edit your profile and account settings.
@@ -348,7 +349,7 @@ const EditProfile: React.FC = () => {
           >
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span style={{ fontSize: '18px' }}>{formData.isPrivate ? '🔒' : '🌍'}</span>
+                <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name={formData.isPrivate ? 'lock' : 'users'} size={18} /></span>
                 <span style={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--ink-900)' }}>
                   {formData.isPrivate ? 'Private Account' : 'Public Account'}
                 </span>

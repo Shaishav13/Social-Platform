@@ -23,15 +23,18 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   const MAX_FILES = 5;
 
   const validateFile = (file: File): string | null => {
-    if (file.size > MAX_FILE_SIZE) {
-      return `File "${file.name}" is too large. Maximum size is 10MB.`;
-    }
-
     const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
-    const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+    const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type) || Boolean(file.name.match(/\.(mp4|webm|mov|m4v)$/i));
 
     if (!isImage && !isVideo) {
       return `File "${file.name}" is not a supported format. Please use JPEG, PNG, GIF, WebP, MP4, MOV, AVI, or WebM.`;
+    }
+
+    const limitMB = isVideo ? 20 : 5;
+    const limitBytes = limitMB * 1024 * 1024;
+
+    if (file.size > limitBytes) {
+      return `File "${file.name}" is too large. Maximum size is ${limitMB}MB.`;
     }
 
     return null;
@@ -286,7 +289,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
               <div className="upload-icon">📸</div>
               <h3>Add photos or videos</h3>
               <p>Drag and drop here or <button type="button" onClick={() => fileInputRef.current?.click()} className="upload-link">browse files</button></p>
-              <p className="upload-hint">Support: Images and Videos up to 10MB each</p>
+              <p className="upload-hint">Support: Images up to 5MB, Videos up to 20MB</p>
             </div>
           )}
         </div>

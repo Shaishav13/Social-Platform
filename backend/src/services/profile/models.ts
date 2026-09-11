@@ -60,6 +60,7 @@ export class ProfileModel {
       followingCount,
       postCount,
       isPrivate: user.isPrivate,
+      is18Plus: user.is18Plus,
       isFollowing,
       createdAt: user.createdAt,
     };
@@ -95,6 +96,7 @@ export class ProfileModel {
       followingCount,
       postCount,
       isPrivate: user.isPrivate,
+      is18Plus: user.is18Plus,
       settings,
       createdAt: user.createdAt,
     };
@@ -122,6 +124,7 @@ export class ProfileModel {
       ...(updateData.bio !== undefined && { bio: updateData.bio }),
       ...(updateData.profilePicture && { profilePicture: updateData.profilePicture }),
       ...(updateData.settings?.isPrivate !== undefined && { isPrivate: updateData.settings.isPrivate }),
+      ...(updateData.is18Plus !== undefined && { is18Plus: updateData.is18Plus }),
     });
 
     // Update profile settings if provided

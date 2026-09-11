@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { User, Post } from '../types';
-import { PostCard, ProfileHeader, SkeletonLoader } from '../components/wren';
+import { PostCard, ProfileHeader, SkeletonLoader, FollowListModal } from '../components/wren';
+import { Icon } from '../components/ui';
 import api from '../services/api';
 
 const Profile: React.FC = () => {
@@ -26,6 +27,7 @@ const Profile: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null);
   const [editFormData, setEditFormData] = useState({
     username: '',
     bio: '',
@@ -321,6 +323,8 @@ const Profile: React.FC = () => {
         followersCount={followerCount}
         followingCount={followingCount}
         isFollowing={isFollowing}
+        onFollowersClick={() => setFollowModal('followers')}
+        onFollowingClick={() => setFollowModal('following')}
       />
 
         {/* Profile Content */}
@@ -328,7 +332,7 @@ const Profile: React.FC = () => {
           {/* Privacy Message for Private Accounts */}
           {profileUser.isPrivate && !canViewPosts() && (
             <div className="private-account-message">
-              <div className="private-icon">🔒</div>
+              <div className="private-icon"><Icon name="lock" size={32} /></div>
               <h3>This account is private</h3>
               <p>Follow {profileUser.username} to see their posts and activity.</p>
             </div>
@@ -339,7 +343,7 @@ const Profile: React.FC = () => {
             <div className="profile-posts-section">
               <div className="section-header">
                 <h2>
-                  <span className="section-icon">📱</span>
+                  <span className="section-icon"><Icon name="dashboard" size={20} /></span>
                   Posts
                 </h2>
                 {isOwnProfile && (
@@ -387,7 +391,7 @@ const Profile: React.FC = () => {
           <div className="modal-content edit-profile-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>
-                <span className="modal-icon">✏️</span>
+                <span className="modal-icon"><Icon name="edit" size={20} /></span>
                 Edit Profile
               </h2>
               <button 
@@ -435,7 +439,7 @@ const Profile: React.FC = () => {
                       htmlFor="profile-picture-input" 
                       className="btn btn-secondary picture-upload-btn"
                     >
-                      <span className="btn-icon">📷</span>
+                      <span className="btn-icon"><Icon name="image" size={16} /></span>
                       Choose Photo
                     </label>
                     {(profilePicturePreview || profilePictureFile) && (
@@ -445,7 +449,7 @@ const Profile: React.FC = () => {
                         className="btn btn-ghost remove-picture-btn"
                         disabled={isUpdating}
                       >
-                        <span className="btn-icon">🗑️</span>
+                        <span className="btn-icon"><Icon name="trash" size={16} /></span>
                         Remove
                       </button>
                     )}
@@ -496,8 +500,10 @@ const Profile: React.FC = () => {
                   <label htmlFor="edit-private" className="toggle-label">
                     <span className="toggle-switch"></span>
                     <div className="toggle-content">
-                      <span className="toggle-title">
-                        {editFormData.isPrivate ? '🔒 Private Account' : '🌍 Public Account'}
+                      <span className="toggle-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {editFormData.isPrivate 
+                          ? <><Icon name="lock" size={16} /> Private Account</> 
+                          : <><Icon name="users" size={16} /> Public Account</>}
                       </span>
                       <span className="toggle-description">
                         {editFormData.isPrivate 
@@ -537,7 +543,7 @@ const Profile: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <span className="btn-icon">💾</span>
+                    <span className="btn-icon"><Icon name="save" size={16} /></span>
                     Save Changes
                   </>
                 )}
@@ -553,7 +559,7 @@ const Profile: React.FC = () => {
           <div className="modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>
-                <span className="modal-icon">⚠️</span>
+                <span className="modal-icon"><Icon name="shield" size={20} /></span>
                 Delete Account
               </h2>
               <button 
@@ -616,7 +622,7 @@ const Profile: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <span className="btn-icon">🗑️</span>
+                    <span className="btn-icon"><Icon name="trash" size={16} /></span>
                     Delete My Account
                   </>
                 )}
@@ -624,6 +630,15 @@ const Profile: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {/* Follow List Modal */}
+      {followModal && id && (
+        <FollowListModal
+          userId={id}
+          type={followModal}
+          count={followModal === 'followers' ? followerCount : followingCount}
+          onClose={() => setFollowModal(null)}
+        />
       )}
     </div>
   );

@@ -440,4 +440,42 @@ router.get('/users/:id/follow', authenticateToken, async (req, res) => {
   }
 });
 
+// Get followers list
+router.get('/users/:id/followers', authenticateToken, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const result = await FollowModel.getFollowersList(targetId);
+    
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting followers list:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get following list
+router.get('/users/:id/following', authenticateToken, async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const result = await FollowModel.getFollowingList(targetId);
+    
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting following list:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;

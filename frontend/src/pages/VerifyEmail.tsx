@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Button } from '../components/ui';
+import { Button, Icon } from '../components/ui';
 
 const VerifyEmail: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -225,7 +225,7 @@ const VerifyEmail: React.FC = () => {
             textAlign: 'left',
           }}
         >
-          <span style={{ fontSize: '20px', lineHeight: 1, marginTop: '1px' }}>📬</span>
+          <span style={{ display: 'flex', alignItems: 'center', color: 'var(--sage-700)', marginTop: '2px' }}><Icon name="notification" size={24} /></span>
           <div style={{ flex: 1 }}>
             <p
               className="type-ui-s"
@@ -260,7 +260,7 @@ const VerifyEmail: React.FC = () => {
               gap: '8px',
             }}
           >
-            <span>✓</span> Email verified successfully! Redirecting to your feed...
+            <span style={{ display: 'flex' }}><Icon name="check" size={18} /></span> Email verified successfully! Redirecting to your feed...
           </div>
         )}
 

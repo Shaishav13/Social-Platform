@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { Icon } from '../components/ui';
 import api from '../services/api';
 
 const Settings: React.FC = () => {
@@ -13,6 +14,11 @@ const Settings: React.FC = () => {
   const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
   const [privacySuccess, setPrivacySuccess] = useState('');
   const [privacyError, setPrivacyError] = useState('');
+
+  const [is18Plus, setIs18Plus] = useState<boolean>(Boolean(user?.is18Plus));
+  const [isUpdating18Plus, setIsUpdating18Plus] = useState(false);
+  const [plus18Success, setPlus18Success] = useState('');
+  const [plus18Error, setPlus18Error] = useState('');
 
   // Delete Account Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -47,6 +53,33 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleToggle18Plus = async (newVal: boolean) => {
+    setIsUpdating18Plus(true);
+    setPlus18Error('');
+    setPlus18Success('');
+
+    try {
+      const response = await api.put('/auth/profile', {
+        is18Plus: newVal
+      });
+
+      if (response.data.success) {
+        setIs18Plus(newVal);
+        updateUser({ ...user, is18Plus: newVal });
+        setPlus18Success(
+          newVal
+            ? '18+ mode enabled. You will now see 18+ content in your feed.'
+            : '18+ mode disabled. 18+ content is now hidden from your feed.'
+        );
+      }
+    } catch (err: any) {
+      console.error('Failed to update 18+ setting:', err);
+      setPlus18Error(err.response?.data?.message || 'Failed to update 18+ preference. Please try again.');
+    } finally {
+      setIsUpdating18Plus(false);
+    }
+  };
+
   const handleDeleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deletePassword) {
@@ -76,7 +109,7 @@ const Settings: React.FC = () => {
     return (
       <div style={{ maxWidth: '480px', margin: '60px auto 0', padding: '0 16px' }}>
         <div className="wren-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '16px' }}>⚙️</div>
+          <div style={{ display: 'flex', justifyContent: 'center', color: 'var(--ink-500)', marginBottom: '16px' }}><Icon name="settings" size={32} /></div>
           <h2 className="type-display-m" style={{ marginBottom: '8px' }}>Authentication Required</h2>
           <p className="type-ui-m" style={{ color: 'var(--ink-600)', marginBottom: '24px' }}>
             Please log in to manage your account settings and privacy preferences.
@@ -127,7 +160,7 @@ const Settings: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span style={{ fontSize: '20px' }}>{isPrivate ? '🔒' : '🌍'}</span>
+              <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name={isPrivate ? 'lock' : 'users'} size={24} /></span>
               <h2 className="type-display-m" style={{ margin: 0, fontSize: '1.25rem' }}>
                 Account Privacy
               </h2>
@@ -195,7 +228,7 @@ const Settings: React.FC = () => {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '14px', color: 'var(--ink-900)' }}>
-                <span>🌍</span> Public Account
+                <span style={{ display: 'flex', color: 'var(--ink-700)' }}><Icon name="users" size={18} /></span> Public Account
               </div>
               {!isPrivate && (
                 <span style={{ color: 'var(--wine-700)', fontSize: '12px', fontWeight: 600 }}>Active</span>
@@ -219,7 +252,7 @@ const Settings: React.FC = () => {
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '14px', color: 'var(--ink-900)' }}>
-                <span>🔒</span> Private Account
+                <span style={{ display: 'flex', color: 'var(--ink-700)' }}><Icon name="lock" size={18} /></span> Private Account
               </div>
               {isPrivate && (
                 <span style={{ color: 'var(--wine-700)', fontSize: '12px', fontWeight: 600 }}>Active</span>
@@ -230,6 +263,49 @@ const Settings: React.FC = () => {
             </p>
           </div>
         </div>
+
+        {/* 18+ Toggle Section */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name={is18Plus ? 'shield' : 'check'} size={24} /></span>
+              <h3 className="type-display-m" style={{ margin: 0, fontSize: '1.1rem' }}>
+                18+ User (NSFW Content)
+              </h3>
+            </div>
+            <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: 0, maxWidth: '85%' }}>
+              Turn this on to mark your account as 18+ and view 18+ content from other authors you follow or who have public accounts. If off, NSFW content is hidden from your feed.
+            </p>
+          </div>
+
+          <label className="wren-switch" style={{ flexShrink: 0, marginTop: '4px' }}>
+            <input
+              type="checkbox"
+              id="settings-18plus-toggle"
+              checked={is18Plus}
+              onChange={(e) => handleToggle18Plus(e.target.checked)}
+              disabled={isUpdating18Plus}
+            />
+            <span className="wren-switch-slider"></span>
+          </label>
+        </div>
+
+        {plus18Success && (
+          <div className="wren-admin-alert wren-admin-alert--success" style={{ margin: '14px 0' }} role="status">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <span>{plus18Success}</span>
+          </div>
+        )}
+
+        {plus18Error && (
+          <div className="wren-error" style={{ margin: '14px 0' }} role="alert">
+            {plus18Error}
+          </div>
+        )}
+
       </div>
 
       {/* SECTION 2: READING MATERIAL & APPEARANCE */}
@@ -261,7 +337,7 @@ const Settings: React.FC = () => {
                 gap: '12px'
               }}
             >
-              <span style={{ fontSize: '20px' }}>☀️</span>
+              <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name="sun" size={24} /></span>
               <div style={{ textAlign: 'left' }}>
                 <div style={{ fontWeight: 600, fontSize: '13.5px' }}>Paper Vellum (Light)</div>
                 <div style={{ fontSize: '12px', color: 'var(--ink-600)', fontWeight: 400 }}>Greige paper & ink</div>
@@ -282,7 +358,7 @@ const Settings: React.FC = () => {
                 gap: '12px'
               }}
             >
-              <span style={{ fontSize: '20px' }}>🌙</span>
+              <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name="moon" size={24} /></span>
               <div style={{ textAlign: 'left' }}>
                 <div style={{ fontWeight: 600, fontSize: '13.5px' }}>Night Study (Dark)</div>
                 <div style={{ fontSize: '12px', color: 'var(--ink-600)', fontWeight: 400 }}>Dark paper & luminous ink</div>
@@ -311,7 +387,7 @@ const Settings: React.FC = () => {
                 gap: '12px'
               }}
             >
-              <span style={{ fontSize: '18px' }}>📖</span>
+              <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name="density" size={24} /></span>
               <div style={{ textAlign: 'left' }}>
                 <div style={{ fontWeight: 600, fontSize: '13.5px' }}>Comfortable</div>
                 <div style={{ fontSize: '12px', color: 'var(--ink-600)', fontWeight: 400 }}>32px editorial rhythm</div>
@@ -332,7 +408,7 @@ const Settings: React.FC = () => {
                 gap: '12px'
               }}
             >
-              <span style={{ fontSize: '18px' }}>📜</span>
+              <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name="dashboard" size={24} /></span>
               <div style={{ textAlign: 'left' }}>
                 <div style={{ fontWeight: 600, fontSize: '13.5px' }}>Compact</div>
                 <div style={{ fontSize: '12px', color: 'var(--ink-600)', fontWeight: 400 }}>20px dense rhythm</div>

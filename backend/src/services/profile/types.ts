@@ -11,6 +11,7 @@ export interface ProfileUpdateRequest {
   username?: string | undefined;
   bio?: string | undefined;
   profilePicture?: string | undefined;
+  is18Plus?: boolean | undefined;
   settings?: Partial<ProfileSettings> | undefined;
 }
 
@@ -23,6 +24,7 @@ export interface PublicProfile {
   followingCount: number;
   postCount: number;
   isPrivate: boolean;
+  is18Plus?: boolean;
   isFollowing?: boolean | undefined; // Only present when viewed by another user
   createdAt: Date;
 }

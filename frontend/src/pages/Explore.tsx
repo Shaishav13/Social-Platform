@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { User, Post } from '../types';
@@ -7,8 +7,19 @@ import { PostCard, SkeletonLoader } from '../components/wren';
 import { Icon } from '../components/ui';
 import api from '../services/api';
 
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
 const Explore: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedQuery = useDebounce(searchQuery.trim(), 350);
   const [searchResults, setSearchResults] = useState<{
     users: User[];
     posts: Post[];
@@ -26,13 +37,13 @@ const Explore: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (searchQuery.trim()) {
-      performSearch();
+    if (debouncedQuery) {
+      performSearch(debouncedQuery);
     } else {
       setSearchResults({ users: [], posts: [] });
       setActiveTab('trending');
     }
-  }, [searchQuery]);
+  }, [debouncedQuery]);
 
   const loadExploreContent = async () => {
     try {
@@ -78,50 +89,26 @@ const Explore: React.FC = () => {
     }
   };
 
-  const performSearch = async () => {
-    if (!searchQuery.trim()) return;
+  const performSearch = useCallback(async (q: string) => {
+    if (!q) return;
     
     try {
       setIsSearching(true);
       
-      // Search in posts from the main feed
-      const feedResponse = await api.get('/content/feed?limit=200&following=false');
-      const allPosts = feedResponse.data.posts || [];
+      const [postsRes, usersRes] = await Promise.all([
+        api.get(`/content/search/posts?q=${encodeURIComponent(q)}`),
+        api.get(`/profile/search/users?q=${encodeURIComponent(q)}`),
+      ]);
+
+      const foundPosts: Post[] = postsRes.data.results || [];
+      const foundUsers: User[] = usersRes.data.data || [];
+
+      setSearchResults({ users: foundUsers, posts: foundPosts });
       
-      // Filter posts that match the search query
-      const matchingPosts = allPosts.filter((post: Post) => 
-        post.content?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      
-      // Get all unique author IDs from matching posts
-      const authorIds = [...new Set(matchingPosts.map((post: Post) => post.authorId))];
-      
-      // Get user profiles for authors and also search by username
-      const userPromises = authorIds.slice(0, 20).map(async (authorId) => {
-        try {
-          const userResponse = await api.get(`/profile/users/${authorId}`);
-          const user = userResponse.data.user;
-          // Also check if username matches search query
-          if (user.username?.toLowerCase().includes(searchQuery.toLowerCase())) {
-            return user;
-          }
-          return null;
-        } catch {
-          return null;
-        }
-      });
-      
-      const matchingUsers = (await Promise.all(userPromises)).filter(user => user !== null);
-      
-      setSearchResults({
-        users: matchingUsers,
-        posts: matchingPosts.slice(0, 20)
-      });
-      
-      // Set active tab based on results
-      if (matchingUsers.length > 0) {
+      // Auto-switch to most relevant tab
+      if (foundUsers.length > 0) {
         setActiveTab('users');
-      } else if (matchingPosts.length > 0) {
+      } else if (foundPosts.length > 0) {
         setActiveTab('posts');
       }
     } catch (error) {
@@ -130,7 +117,7 @@ const Explore: React.FC = () => {
     } finally {
       setIsSearching(false);
     }
-  };
+  }, []);
 
   const handlePostUpdate = (updatedPost: Post) => {
     setTrendingPosts(prev => 
@@ -277,107 +264,113 @@ const Explore: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="search-results-layout">
-            {/* Search Results Tabs */}
-            <div className="explore-tabs">
-              {(searchResults.users.length > 0) && (
-                <button
-                  className={`tab-btn ${activeTab === 'users' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('users')}
-                >
-                  Users ({searchResults.users.length})
-                </button>
-              )}
-              {(searchResults.posts.length > 0) && (
-                <button
-                  className={`tab-btn ${activeTab === 'posts' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('posts')}
-                >
-                  Posts ({searchResults.posts.length})
-                </button>
-              )}
+          /* ── Search Results ── */
+          <div className="explore-search-results">
+            {/* Tabs — always show both so user can switch freely */}
+            <div className="explore-search-tabs">
+              <button
+                className={`explore-search-tab ${activeTab === 'users' ? 'active' : ''}`}
+                onClick={() => setActiveTab('users')}
+              >
+                <Icon name="users" size={15} />
+                <span>People</span>
+                {searchResults.users.length > 0 && (
+                  <span className="explore-tab-pill">{searchResults.users.length}</span>
+                )}
+              </button>
+              <button
+                className={`explore-search-tab ${activeTab === 'posts' ? 'active' : ''}`}
+                onClick={() => setActiveTab('posts')}
+              >
+                <Icon name="dashboard" size={15} />
+                <span>Posts</span>
+                {searchResults.posts.length > 0 && (
+                  <span className="explore-tab-pill">{searchResults.posts.length}</span>
+                )}
+              </button>
             </div>
 
-            {/* Search Results Content */}
-            <div className="search-results-content">
+            {/* Content */}
+            <div className="explore-search-content">
+              {/* Loading skeleton */}
               {isSearching && (
-                <div className="loading-state">
-                  <div className="loading-spinner">Searching...</div>
+                <div className="explore-search-loading">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="search-user-card search-skeleton" style={{ pointerEvents: 'none' }}>
+                      <div className="search-skeleton-avatar" />
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div className="search-skeleton-line" style={{ width: '40%' }} />
+                        <div className="search-skeleton-line" style={{ width: '65%', opacity: 0.5 }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
-              {activeTab === 'users' && (
-                <div className="search-results-users">
+              {/* Users Tab */}
+              {!isSearching && activeTab === 'users' && (
+                <div className="explore-results-section">
                   {searchResults.users.length > 0 ? (
-                    <div className="users-list">
-                      {searchResults.users.map(searchUser => (
-                        <div key={searchUser.id} className="user-result">
-                          <Link to={`/profile/${searchUser.id}`} className="user-result-link">
-                            {searchUser.profilePicture ? (
-                              <img
-                                src={searchUser.profilePicture}
-                                alt={searchUser.username}
-                                className="user-result-avatar"
-                              />
-                            ) : (
-                              <div className="user-result-avatar-placeholder">
-                                {searchUser.username.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <div className="user-result-info">
-                              <h4 className="user-result-username">{searchUser.username}</h4>
-                              {searchUser.bio && (
-                                <p className="user-result-bio">{searchUser.bio}</p>
-                              )}
+                    searchResults.users.map(searchUser => (
+                      <Link
+                        key={searchUser.id}
+                        to={`/profile/${searchUser.id}`}
+                        className="search-user-card"
+                      >
+                        <div className="search-user-avatar-wrap">
+                          {searchUser.profilePicture ? (
+                            <img
+                              src={searchUser.profilePicture}
+                              alt={searchUser.username}
+                              className="search-user-avatar"
+                            />
+                          ) : (
+                            <div className="search-user-avatar-placeholder">
+                              {searchUser.username.charAt(0).toUpperCase()}
                             </div>
-                          </Link>
-                          {searchUser.id !== user?.id && (
-                            <button className="btn btn-outline btn-sm">
-                              Follow
-                            </button>
                           )}
                         </div>
-                      ))}
-                    </div>
+                        <div className="search-user-info">
+                          <span className="search-user-name">{searchUser.username}</span>
+                          {searchUser.bio && (
+                            <span className="search-user-bio">{searchUser.bio}</span>
+                          )}
+                        </div>
+                        <span className="search-user-arrow">
+                          <Icon name="chevron-right" size={16} />
+                        </span>
+                      </Link>
+                    ))
                   ) : (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">👤</div>
-                      <h3>No users found</h3>
-                      <p>Try searching with different keywords.</p>
+                    <div className="explore-empty-state">
+                      <Icon name="users" size={40} />
+                      <p>No people found for <strong>"{debouncedQuery}"</strong></p>
+                      <span>Try a different name or spelling.</span>
                     </div>
                   )}
                 </div>
               )}
 
-              {activeTab === 'posts' && (
-                <div className="search-results-posts">
+              {/* Posts Tab */}
+              {!isSearching && activeTab === 'posts' && (
+                <div className="explore-results-section">
                   {searchResults.posts.length > 0 ? (
-                    <div className="posts-container">
-                      {searchResults.posts.map(post => (
-                        <PostCard
-                          key={post.id}
-                          post={post}
-                          currentUser={user || undefined}
-                          onPostUpdate={handlePostUpdate}
-                          onPostDelete={handlePostDelete}
-                        />
-                      ))}
-                    </div>
+                    searchResults.posts.map(post => (
+                      <PostCard
+                        key={post.id}
+                        post={post}
+                        currentUser={user || undefined}
+                        onPostUpdate={handlePostUpdate}
+                        onPostDelete={handlePostDelete}
+                      />
+                    ))
                   ) : (
-                    <div className="empty-state">
-                      <div className="empty-state-icon">📝</div>
-                      <h3>No posts found</h3>
-                      <p>Try searching with different keywords.</p>
+                    <div className="explore-empty-state">
+                      <Icon name="dashboard" size={40} />
+                      <p>No posts found for <strong>"{debouncedQuery}"</strong></p>
+                      <span>Try different keywords.</span>
                     </div>
                   )}
-                </div>
-              )}
-
-              {!isSearching && !hasSearchResults && (
-                <div className="empty-state">
-                  <div className="empty-state-icon">🔍</div>
-                  <h3>No results found</h3>
-                  <p>Try searching for users, posts, or different keywords.</p>
                 </div>
               )}
             </div>
@@ -388,4 +381,4 @@ const Explore: React.FC = () => {
   );
 };
 
-export default Explore;
+export default Explore;

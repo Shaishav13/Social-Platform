@@ -304,6 +304,14 @@ export class FollowModel {
     return SocialDatabase.getPendingFollowRequests(userId);
   }
 
+  static async getFollowersList(userId: string): Promise<any[]> {
+    return await SocialDatabase.getFollowersList(userId);
+  }
+
+  static async getFollowingList(userId: string): Promise<any[]> {
+    return await SocialDatabase.getFollowingList(userId);
+  }
+
   static validateFollowRequest(requesterId: string, targetId: string): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 

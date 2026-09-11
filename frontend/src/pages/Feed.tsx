@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { Post } from '../types';
-import { PostCard, ComposeLetter, SkeletonLoader } from '../components/wren';
+import { PostCard, SkeletonLoader } from '../components/wren';
 import api from '../services/api';
 
 const Feed: React.FC = () => {
@@ -63,9 +63,6 @@ const Feed: React.FC = () => {
 
   return (
     <div className="wren-feed-view">
-      {/* Editorial Composer at head of feed */}
-      <ComposeLetter onPostCreated={() => loadFeed(1, false)} />
-
       {/* Error alert in active plain language */}
       {error && (
         <div className="wren-error" role="alert">

@@ -5,11 +5,13 @@ import api from '../../services/api';
 interface ComposeLetterProps {
   onPostCreated?: () => void;
   placeholder?: string;
+  isStandalone?: boolean;
 }
 
 export const ComposeLetter: React.FC<ComposeLetterProps> = ({
   onPostCreated,
   placeholder = 'Write a letter, essay, or thought...',
+  isStandalone = false,
 }) => {
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,11 +30,15 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
 
     const newAttachments: { file: File; previewUrl: string; isVideo: boolean }[] = [];
     for (const file of files) {
-      if (file.size > 25 * 1024 * 1024) {
-        setError(`"${file.name}" exceeds the 25MB file size limit.`);
+      const isVideo = file.type.startsWith('video/') || Boolean(file.name.match(/\.(mp4|webm|mov|m4v)$/i));
+      const limitMB = isVideo ? 20 : 5;
+      const limitBytes = limitMB * 1024 * 1024;
+      
+      if (file.size > limitBytes) {
+        setError(`"${file.name}" exceeds the ${limitMB}MB size limit.`);
         return;
       }
-      const isVideo = file.type.startsWith('video/') || Boolean(file.name.match(/\.(mp4|webm|mov|m4v)$/i));
+      
       newAttachments.push({
         file,
         previewUrl: URL.createObjectURL(file),
@@ -82,7 +88,6 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
         const formData = new FormData();
         selectedFiles.forEach((item) => {
           formData.append('media', item.file);
-          formData.append('files', item.file);
         });
 
         const uploadRes = await api.post('/content/upload', formData, {
@@ -121,7 +126,7 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
   const hasContent = content.trim().length > 0 || selectedFiles.length > 0;
 
   return (
-    <form className="wren-compose" onSubmit={handleSubmit} aria-label="Compose post">
+    <form className={`wren-compose ${isStandalone ? 'standalone' : ''}`} onSubmit={handleSubmit} aria-label="Compose post" style={isStandalone ? { padding: 0, border: 'none', margin: 0 } : undefined}>
       {error && <div className="wren-error" role="alert" style={{ marginBottom: '12px' }}>{error}</div>}
 
       <textarea
@@ -129,7 +134,8 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
         placeholder={placeholder}
         value={content}
         onChange={e => setContent(e.target.value)}
-        rows={2}
+        rows={isStandalone ? 8 : 2}
+        style={isStandalone ? { minHeight: '300px', fontSize: '18px', padding: '24px', backgroundColor: 'transparent', border: 'none', boxShadow: 'none' } : undefined}
         aria-label="Write a letter or post"
       />
 
@@ -264,12 +270,13 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
         </div>
 
         {/* Send button fades in only when text exists (absent when empty) */}
-        <div className={`wren-compose-btn ${hasContent ? 'is-visible' : ''}`}>
+        <div className={`wren-compose-btn ${hasContent || isStandalone ? 'is-visible' : ''}`} style={isStandalone ? { opacity: 1, pointerEvents: 'auto', transform: 'none' } : undefined}>
           <Button
             type="submit"
             variant="primary"
             disabled={!hasContent || isSubmitting}
             isLoading={isSubmitting}
+            style={isStandalone ? { padding: '10px 24px', fontSize: '15px' } : undefined}
           >
             Publish Letter
           </Button>

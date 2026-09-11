@@ -477,6 +477,42 @@ export class SocialDatabase {
     return follow !== null;
   }
 
+  static async getFollowersList(userId: string): Promise<any[]> {
+    const client = await DatabaseConnection.getClient();
+    
+    try {
+      const result = await client.query(
+        `SELECT u.id, u.username, u.email, u.bio, u.profile_picture as "profilePicture", u.is_private as "isPrivate", u.is_18_plus as "is18Plus"
+         FROM follows f
+         JOIN users u ON f.follower_id = u.id
+         WHERE f.following_id = $1
+         ORDER BY f.created_at DESC`,
+        [userId]
+      );
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  }
+
+  static async getFollowingList(userId: string): Promise<any[]> {
+    const client = await DatabaseConnection.getClient();
+    
+    try {
+      const result = await client.query(
+        `SELECT u.id, u.username, u.email, u.bio, u.profile_picture as "profilePicture", u.is_private as "isPrivate", u.is_18_plus as "is18Plus"
+         FROM follows f
+         JOIN users u ON f.following_id = u.id
+         WHERE f.follower_id = $1
+         ORDER BY f.created_at DESC`,
+        [userId]
+      );
+      return result.rows;
+    } finally {
+      client.release();
+    }
+  }
+
   // Data export methods
   static async getUserComments(userId: string): Promise<Comment[]> {
     const client = await DatabaseConnection.getClient();

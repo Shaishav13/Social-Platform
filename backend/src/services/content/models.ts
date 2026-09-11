@@ -213,9 +213,11 @@ export class MediaModel {
       throw new Error(`Unsupported file type: ${file.mimetype}`);
     }
 
-    // Validate file size (50MB default limit)
-    if (!FileStorageService.validateFileSize(file.size)) {
-      throw new Error('File size exceeds maximum limit of 50MB');
+    // Validate file size based on type
+    const isVideo = file.mimetype.startsWith('video/');
+    const limitMB = isVideo ? 20 : 5;
+    if (!FileStorageService.validateFileSize(file.size, limitMB)) {
+      throw new Error(`File size exceeds maximum limit of ${limitMB}MB`);
     }
 
     // Save file to storage
@@ -289,9 +291,11 @@ export class MediaModel {
       errors.push(`Unsupported file type: ${file.mimetype}. Supported types: JPEG, PNG, GIF, MP4, MOV, AVI`);
     }
 
-    // Validate file size
-    if (!FileStorageService.validateFileSize(file.size)) {
-      errors.push('File size exceeds maximum limit of 50MB');
+    // Validate file size based on type
+    const isVideo = file.mimetype.startsWith('video/');
+    const limitMB = isVideo ? 20 : 5;
+    if (!FileStorageService.validateFileSize(file.size, limitMB)) {
+      errors.push(`File size exceeds maximum limit of ${limitMB}MB`);
     }
 
     // Validate filename
@@ -324,6 +328,6 @@ export class MediaModel {
   }
 
   static getMaxFileSize(): number {
-    return 50 * 1024 * 1024; // 50MB in bytes
+    return 20 * 1024 * 1024; // 20MB in bytes (max overall limit for video)
   }
 }

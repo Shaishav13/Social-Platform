@@ -13,6 +13,8 @@ interface ProfileHeaderProps {
   followersCount?: number;
   followingCount?: number;
   isFollowing?: boolean;
+  onFollowersClick?: () => void;
+  onFollowingClick?: () => void;
 }
 
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
@@ -24,6 +26,8 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   followersCount = 0,
   followingCount = 0,
   isFollowing = false,
+  onFollowersClick,
+  onFollowingClick,
 }) => {
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [bioText, setBioText] = useState(user.bio || '');
@@ -154,18 +158,29 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         </p>
       )}
 
-      {/* Stats: plain ui-m text separated by single spaces, not pipes or dots */}
+      {/* Stats: clickable followers and following */}
       <div className="wren-profile-stats">
         <span>
           <strong>{postCount}</strong> posts
         </span>
-        <span>
+        <button
+          type="button"
+          className="wren-profile-stat-btn"
+          onClick={onFollowersClick}
+          disabled={!onFollowersClick}
+        >
           <strong>{followersCount}</strong> followers
-        </span>
-        <span>
+        </button>
+        <button
+          type="button"
+          className="wren-profile-stat-btn"
+          onClick={onFollowingClick}
+          disabled={!onFollowingClick}
+        >
           <strong>{followingCount}</strong> following
-        </span>
+        </button>
       </div>
     </header>
   );
 };
+

@@ -6,6 +6,7 @@ export interface User {
   profilePicture?: string;
   bio?: string;
   isPrivate: boolean;
+  is18Plus?: boolean;
   role?: 'admin' | 'moderator' | 'user';
   isRestricted?: boolean;
   isVerified?: boolean;
