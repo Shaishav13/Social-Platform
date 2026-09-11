@@ -11,7 +11,8 @@ const EditProfile: React.FC = () => {
   const [formData, setFormData] = useState({
     username: '',
     bio: '',
-    isPrivate: false
+    isPrivate: false,
+    is18Plus: false
   });
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -40,7 +41,8 @@ const EditProfile: React.FC = () => {
       setFormData({
         username: user.username || '',
         bio: user.bio || '',
-        isPrivate: Boolean(user.isPrivate)
+        isPrivate: user.isPrivate || false,
+        is18Plus: user.is18Plus || false
       });
     }
   }, [user]);
@@ -122,6 +124,7 @@ const EditProfile: React.FC = () => {
         username: formData.username.trim(),
         bio: formData.bio.trim(),
         isPrivate: formData.isPrivate,
+        is18Plus: formData.is18Plus,
         ...(profilePictureUrl && { profilePicture: profilePictureUrl })
       });
 
@@ -460,6 +463,66 @@ const EditProfile: React.FC = () => {
                 checked={formData.isPrivate}
                 onChange={(e) => {
                   setFormData(prev => ({ ...prev, isPrivate: e.target.checked }));
+                  setError('');
+                  setSuccess('');
+                }}
+                disabled={isUpdating}
+              />
+              <span className="wren-switch-slider"></span>
+            </label>
+          </div>
+
+          {/* 18+ Setting */}
+          <div
+            style={{
+              padding: '16px 18px',
+              backgroundColor: 'var(--paper-200)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              marginTop: '8px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: '16px'
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name="eye-off" size={18} /></span>
+                <span style={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--ink-900)' }}>
+                  {formData.is18Plus ? '18+ Account' : 'Standard Account'}
+                </span>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    backgroundColor: formData.is18Plus ? 'rgba(162, 63, 46, 0.12)' : 'rgba(75, 107, 78, 0.12)',
+                    color: formData.is18Plus ? 'var(--rust-alert)' : 'var(--moss-600)',
+                    border: `1px solid ${formData.is18Plus ? 'var(--rust-alert)' : 'var(--moss-600)'}`
+                  }}
+                >
+                  {formData.is18Plus ? 'NSFW' : 'SFW'}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--ink-600)', lineHeight: 1.45 }}>
+                {formData.is18Plus
+                  ? 'Your account contains explicit material. Non-18+ users will not see your posts in their feed.'
+                  : 'Your account is suitable for all audiences.'}
+              </p>
+            </div>
+            <label className="wren-switch" style={{ marginTop: '2px', flexShrink: 0 }}>
+              <input
+                type="checkbox"
+                id="is18Plus"
+                name="is18Plus"
+                checked={formData.is18Plus}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, is18Plus: e.target.checked }));
                   setError('');
                   setSuccess('');
                 }}
