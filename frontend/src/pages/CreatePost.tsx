@@ -14,8 +14,8 @@ const CreatePostPage: React.FC = () => {
         <h1 className="type-display-l" style={{ margin: 0 }}>Compose</h1>
         <button
           onClick={() => navigate(-1)}
-          className="wren-btn wren-btn-ghost"
-          style={{ padding: '8px 16px', fontSize: '14px', color: 'var(--ink-600)' }}
+          className="wren-btn wren-btn-outline"
+          style={{ padding: '8px 16px', fontSize: '14px', color: 'var(--ink-900)', background: 'var(--paper-100)' }}
           title="Cancel"
         >
           Cancel

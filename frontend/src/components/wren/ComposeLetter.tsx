@@ -259,13 +259,13 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
           />
           <label
             htmlFor="wren-file-upload"
-            className="wren-action-item"
-            style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            className="wren-btn wren-btn-outline"
+            style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px' }}
             title="Attach images or videos (up to 5)"
             aria-label="Attach media"
           >
-            <Icon name="image" size={18} />
-            <span style={{ fontSize: '13px', color: 'var(--ink-600)' }}>Photos & Videos</span>
+            <Icon name="image" size={16} />
+            <span style={{ fontSize: '13px', fontWeight: 500 }}>Photos & Videos</span>
           </label>
         </div>
 
