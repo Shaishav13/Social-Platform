@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import type { User, Post } from '../types';
 import SearchBar from '../components/Search/SearchBar';
 import { PostCard, SkeletonLoader } from '../components/wren';
+import { Icon } from '../components/ui';
 import api from '../services/api';
 
 const Explore: React.FC = () => {
@@ -179,7 +180,7 @@ const Explore: React.FC = () => {
             {/* Main Content - Trending Posts */}
             <div className="explore-main">
               <div className="section-header">
-                <h2>🔥 Trending Posts</h2>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="features" size={24} /> Trending Posts</h2>
                 <p>Posts with the most likes and comments from the community</p>
               </div>
               
@@ -197,7 +198,7 @@ const Explore: React.FC = () => {
                 </div>
               ) : (
                 <div className="empty-state">
-                  <div className="empty-state-icon">📈</div>
+                  <div className="empty-state-icon"><Icon name="search" size={48} /></div>
                   <h3>No trending posts</h3>
                   <p>Check back later for trending content.</p>
                 </div>
@@ -209,7 +210,7 @@ const Explore: React.FC = () => {
               {suggestedUsers.length > 0 && (
                 <div className="suggested-users-widget">
                   <div className="widget-header">
-                    <h3>👥 Suggested for you</h3>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="users" size={20} /> Suggested for you</h3>
                   </div>
                   <div className="users-list-compact">
                     {suggestedUsers.slice(0, 8).map(suggestedUser => (
@@ -248,7 +249,7 @@ const Explore: React.FC = () => {
               {/* Trending Topics Widget */}
               <div className="trending-topics-widget">
                 <div className="widget-header" style={{ marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: 600 }}>📊 Trending Topics</h3>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="dashboard" size={20} /> Trending Topics</h3>
                 </div>
                 <div className="trending-topics-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div className="trending-topic" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
