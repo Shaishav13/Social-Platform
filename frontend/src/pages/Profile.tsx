@@ -25,18 +25,9 @@ const Profile: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
+
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null);
-  const [editFormData, setEditFormData] = useState({
-    username: '',
-    bio: '',
-    isPrivate: false
-  });
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
-  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
-  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const isOwnProfile = currentUser?.id === id;
@@ -47,19 +38,6 @@ const Profile: React.FC = () => {
       loadUserPosts();
     }
   }, [id]);
-
-  useEffect(() => {
-    if (profileUser) {
-      setEditFormData({
-        username: profileUser.username || '',
-        bio: profileUser.bio || '',
-        isPrivate: profileUser.isPrivate || false
-      });
-      // Reset profile picture states when profile changes
-      setProfilePictureFile(null);
-      setProfilePicturePreview(null);
-    }
-  }, [profileUser]);
 
   // Close profile menu when clicking outside
   useEffect(() => {
@@ -161,93 +139,6 @@ const Profile: React.FC = () => {
     }
   };
 
-  const handleEditProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isUpdating) return;
-
-    setIsUpdating(true);
-    try {
-      // First upload profile picture if a new one is selected
-      let profilePictureUrl = profileUser?.profilePicture;
-      
-      if (profilePictureFile) {
-        setIsUploadingPicture(true);
-        const formData = new FormData();
-        formData.append('avatar', profilePictureFile);
-
-        const uploadResponse = await api.post('/profile/avatar', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        if (uploadResponse.data.url) {
-          profilePictureUrl = uploadResponse.data.url;
-        }
-        setIsUploadingPicture(false);
-      }
-
-      // Then update profile information
-      const response = await api.put('/profile', {
-        username: editFormData.username.trim(),
-        bio: editFormData.bio.trim(),
-        isPrivate: editFormData.isPrivate,
-        ...(profilePictureUrl && { profilePicture: profilePictureUrl })
-      });
-
-      if (response.data.success) {
-        setProfileUser(prev => prev ? {
-          ...prev,
-          username: editFormData.username.trim(),
-          bio: editFormData.bio.trim(),
-          isPrivate: editFormData.isPrivate,
-          profilePicture: profilePictureUrl
-        } : null);
-        setShowEditModal(false);
-        setProfilePictureFile(null);
-        setProfilePicturePreview(null);
-        // Reload posts if privacy setting changed
-        loadUserPosts();
-      }
-    } catch (error: any) {
-      console.error('Failed to update profile:', error);
-      alert(error.response?.data?.message || 'Failed to update profile');
-    } finally {
-      setIsUpdating(false);
-      setIsUploadingPicture(false);
-    }
-  };
-
-  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
-        return;
-      }
-
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
-        return;
-      }
-
-      setProfilePictureFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setProfilePicturePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeProfilePicture = () => {
-    setProfilePictureFile(null);
-    setProfilePicturePreview(null);
-  };
 
   const handlePostUpdate = (updatedPost: Post) => {
     setPosts(prev => 
@@ -317,7 +208,6 @@ const Profile: React.FC = () => {
       <ProfileHeader
         user={profileUser}
         isOwnProfile={isOwnProfile}
-        onBioUpdate={(newBio) => setProfileUser(prev => prev ? { ...prev, bio: newBio } : null)}
         onFollowToggle={handleFollowToggle}
         postCount={postCount}
         followersCount={followerCount}
@@ -385,173 +275,7 @@ const Profile: React.FC = () => {
           )}
         </div>
 
-      {/* Edit Profile Modal */}
-      {showEditModal && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-content edit-profile-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>
-                <span className="modal-icon"><Icon name="edit" size={20} /></span>
-                Edit Profile
-              </h2>
-              <button 
-                className="modal-close-btn"
-                onClick={() => setShowEditModal(false)}
-                disabled={isUpdating}
-              >
-                ×
-              </button>
-            </div>
-            
-            <form onSubmit={handleEditProfile} className="modal-body">
-              <div className="form-group profile-picture-section">
-                <label>Profile Picture</label>
-                <div className="profile-picture-upload">
-                  <div className="current-picture">
-                    {profilePicturePreview ? (
-                      <img 
-                        src={profilePicturePreview} 
-                        alt="Profile preview"
-                        className="profile-picture-preview"
-                      />
-                    ) : profileUser?.profilePicture ? (
-                      <img 
-                        src={profileUser.profilePicture} 
-                        alt="Current profile"
-                        className="profile-picture-preview"
-                      />
-                    ) : (
-                      <div className="profile-picture-placeholder">
-                        {profileUser?.username.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="picture-upload-controls">
-                    <input
-                      type="file"
-                      id="profile-picture-input"
-                      accept="image/*"
-                      onChange={handleProfilePictureChange}
-                      className="picture-input"
-                      disabled={isUpdating}
-                    />
-                    <label 
-                      htmlFor="profile-picture-input" 
-                      className="btn btn-secondary picture-upload-btn"
-                    >
-                      <span className="btn-icon"><Icon name="image" size={16} /></span>
-                      Choose Photo
-                    </label>
-                    {(profilePicturePreview || profilePictureFile) && (
-                      <button
-                        type="button"
-                        onClick={removeProfilePicture}
-                        className="btn btn-ghost remove-picture-btn"
-                        disabled={isUpdating}
-                      >
-                        <span className="btn-icon"><Icon name="trash" size={16} /></span>
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                  <small className="upload-hint">
-                    JPG, PNG, GIF up to 5MB. Recommended: 400x400px
-                  </small>
-                </div>
-              </div>
 
-              <div className="form-group">
-                <label htmlFor="edit-username">Username</label>
-                <input
-                  id="edit-username"
-                  type="text"
-                  value={editFormData.username}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, username: e.target.value }))}
-                  placeholder="Enter your username"
-                  maxLength={50}
-                  required
-                  disabled={isUpdating}
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="edit-bio">Bio</label>
-                <textarea
-                  id="edit-bio"
-                  value={editFormData.bio}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, bio: e.target.value }))}
-                  placeholder="Tell us about yourself..."
-                  maxLength={500}
-                  rows={4}
-                  disabled={isUpdating}
-                />
-                <small className="char-count">{editFormData.bio.length}/500</small>
-              </div>
-
-              <div className="form-group privacy-setting">
-                <div className="privacy-toggle">
-                  <input
-                    id="edit-private"
-                    type="checkbox"
-                    checked={editFormData.isPrivate}
-                    onChange={(e) => setEditFormData(prev => ({ ...prev, isPrivate: e.target.checked }))}
-                    disabled={isUpdating}
-                  />
-                  <label htmlFor="edit-private" className="toggle-label">
-                    <span className="toggle-switch"></span>
-                    <div className="toggle-content">
-                      <span className="toggle-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {editFormData.isPrivate 
-                          ? <><Icon name="lock" size={16} /> Private Account</> 
-                          : <><Icon name="users" size={16} /> Public Account</>}
-                      </span>
-                      <span className="toggle-description">
-                        {editFormData.isPrivate 
-                          ? 'Only your followers can see your posts'
-                          : 'Anyone can see your posts'
-                        }
-                      </span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </form>
-            
-            <div className="modal-footer">
-              <button
-                type="button"
-                onClick={() => setShowEditModal(false)}
-                className="btn btn-secondary"
-                disabled={isUpdating}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEditProfile}
-                className="btn btn-primary"
-                disabled={isUpdating || isUploadingPicture}
-              >
-                {isUploadingPicture ? (
-                  <>
-                    <span className="loading-spinner small"></span>
-                    Uploading Photo...
-                  </>
-                ) : isUpdating ? (
-                  <>
-                    <span className="loading-spinner small"></span>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <span className="btn-icon"><Icon name="save" size={16} /></span>
-                    Save Changes
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Account Confirmation Modal */}
       {showDeleteModal && (

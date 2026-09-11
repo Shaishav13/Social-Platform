@@ -7,7 +7,7 @@ import api from '../../services/api';
 interface ProfileHeaderProps {
   user: User;
   isOwnProfile?: boolean;
-  onBioUpdate?: (newBio: string) => void;
+
   onFollowToggle?: () => void;
   postCount?: number;
   followersCount?: number;
@@ -20,7 +20,7 @@ interface ProfileHeaderProps {
 export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   user,
   isOwnProfile = false,
-  onBioUpdate,
+
   onFollowToggle,
   postCount = 0,
   followersCount = 0,
@@ -29,23 +29,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onFollowersClick,
   onFollowingClick,
 }) => {
-  const [isEditingBio, setIsEditingBio] = useState(false);
-  const [bioText, setBioText] = useState(user.bio || '');
-  const [isSavingBio, setIsSavingBio] = useState(false);
   const [followHovered, setFollowHovered] = useState(false);
-
-  const handleSaveBio = async () => {
-    try {
-      setIsSavingBio(true);
-      await api.put(`/profile/users/${user.id}`, { bio: bioText });
-      setIsEditingBio(false);
-      onBioUpdate?.(bioText);
-    } catch {
-      alert('Failed to update bio.');
-    } finally {
-      setIsSavingBio(false);
-    }
-  };
 
   return (
     <header className="wren-profile-header">
@@ -119,44 +103,10 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
         </div>
       </div>
 
-      {/* Bio: editable in place on own profile with 1px dashed underline on hover */}
-      {isEditingBio ? (
-        <div style={{ marginTop: '12px' }}>
-          <textarea
-            className="wren-compose-input"
-            value={bioText}
-            onChange={e => setBioText(e.target.value)}
-            rows={3}
-            style={{ maxWidth: '48ch', fontSize: '15px' }}
-            autoFocus
-          />
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <button
-              onClick={handleSaveBio}
-              className="wren-btn wren-btn-primary"
-              style={{ minHeight: '32px', padding: '4px 12px', fontSize: '13px' }}
-              disabled={isSavingBio}
-            >
-              {isSavingBio ? 'Saving...' : 'Save'}
-            </button>
-            <button
-              onClick={() => setIsEditingBio(false)}
-              className="wren-btn wren-btn-secondary"
-              style={{ minHeight: '32px', padding: '4px 12px', fontSize: '13px' }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <p
-          className={`wren-profile-bio ${isOwnProfile ? 'editable' : ''}`}
-          onClick={() => isOwnProfile && setIsEditingBio(true)}
-          title={isOwnProfile ? 'Click to edit your bio' : undefined}
-        >
-          {user.bio || (isOwnProfile ? 'Add a short bio to introduce your writing...' : '')}
-        </p>
-      )}
+      {/* Bio */}
+      <p className="wren-profile-bio">
+        {user.bio || (isOwnProfile ? 'Add a short bio to introduce your writing...' : '')}
+      </p>
 
       {/* Stats: clickable followers and following */}
       <div className="wren-profile-stats">

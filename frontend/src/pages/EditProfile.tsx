@@ -31,6 +31,10 @@ const EditProfile: React.FC = () => {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [showPasswordSection, setShowPasswordSection] = useState(false);
 
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+
   useEffect(() => {
     if (user) {
       setFormData({
@@ -61,6 +65,24 @@ const EditProfile: React.FC = () => {
     setPasswordSuccess('');
   };
 
+  const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError('Please select an image file');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setError('File size must be less than 5MB');
+        return;
+      }
+      setProfilePictureFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setProfilePicturePreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isUpdating) return;
@@ -81,10 +103,26 @@ const EditProfile: React.FC = () => {
     setSuccess('');
 
     try {
-      const response = await api.put('/auth/profile', {
+      let profilePictureUrl = user?.profilePicture;
+
+      if (profilePictureFile) {
+        setIsUploadingPicture(true);
+        const formData = new FormData();
+        formData.append('avatar', profilePictureFile);
+        const uploadResponse = await api.post('/profile/avatar', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        if (uploadResponse.data.url) {
+          profilePictureUrl = uploadResponse.data.url;
+        }
+        setIsUploadingPicture(false);
+      }
+
+      const response = await api.put('/profile', {
         username: formData.username.trim(),
         bio: formData.bio.trim(),
-        isPrivate: formData.isPrivate
+        isPrivate: formData.isPrivate,
+        ...(profilePictureUrl && { profilePicture: profilePictureUrl })
       });
 
       if (response.data.success) {
@@ -101,6 +139,7 @@ const EditProfile: React.FC = () => {
       setError(errorMessage);
     } finally {
       setIsUpdating(false);
+      setIsUploadingPicture(false);
     }
   };
 
@@ -226,30 +265,68 @@ const EditProfile: React.FC = () => {
 
       {/* Section 1: Profile Information */}
       <div className="wren-card" style={{ marginBottom: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-          {user.profilePicture ? (
-            <img
-              src={user.profilePicture}
-              alt={user.username}
-              className="wren-avatar"
-              style={{ width: '56px', height: '56px', objectFit: 'cover' }}
-            />
-          ) : (
-            <div
-              className="wren-avatar-placeholder"
-              style={{ width: '56px', height: '56px', fontSize: '20px' }}
-            >
-              {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
-            </div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ position: 'relative' }}>
+            {profilePicturePreview ? (
+              <img
+                src={profilePicturePreview}
+                alt="Profile preview"
+                className="wren-avatar"
+                style={{ width: '72px', height: '72px', objectFit: 'cover' }}
+              />
+            ) : user.profilePicture ? (
+              <img
+                src={user.profilePicture}
+                alt={user.username}
+                className="wren-avatar"
+                style={{ width: '72px', height: '72px', objectFit: 'cover' }}
+              />
+            ) : (
+              <div
+                className="wren-avatar-placeholder"
+                style={{ width: '72px', height: '72px', fontSize: '24px' }}
+              >
+                {user.username ? user.username.charAt(0).toUpperCase() : 'U'}
+              </div>
+            )}
+          </div>
           <div>
-            <h2 className="type-display-m" style={{ margin: '0 0 4px', fontSize: '1.25rem' }}>
+            <h2 className="type-display-m" style={{ margin: '0 0 8px', fontSize: '1.25rem' }}>
               Profile Information
             </h2>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', fontSize: '13px', color: 'var(--ink-600)' }}>
-              <span>@{user.username}</span>
-              <span>•</span>
-              <span>{user.email}</span>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <input
+                type="file"
+                id="edit-profile-picture-input"
+                accept="image/*"
+                onChange={handleProfilePictureChange}
+                style={{ display: 'none' }}
+                disabled={isUpdating || isUploadingPicture}
+              />
+              <label 
+                htmlFor="edit-profile-picture-input" 
+                className="wren-btn wren-btn-outline"
+                style={{ cursor: 'pointer', padding: '6px 12px', fontSize: '13px' }}
+              >
+                {isUploadingPicture ? 'Uploading...' : 'Change Photo'}
+              </label>
+              {(profilePicturePreview || profilePictureFile) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfilePictureFile(null);
+                    setProfilePicturePreview(null);
+                  }}
+                  className="wren-btn wren-btn-ghost"
+                  style={{ padding: '6px 12px', fontSize: '13px' }}
+                  disabled={isUpdating || isUploadingPicture}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--ink-600)', marginTop: '8px' }}>
+              JPG, PNG, GIF up to 5MB. Recommended: 400x400px
             </div>
           </div>
         </div>
