@@ -142,7 +142,6 @@ const Explore: React.FC = () => {
   };
 
   const isSearchActive = searchQuery.trim().length > 0;
-  const hasSearchResults = searchResults.users.length > 0 || searchResults.posts.length > 0;
 
   if (isLoading) {
     return <SkeletonLoader count={3} />;

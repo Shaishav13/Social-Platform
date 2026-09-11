@@ -16,8 +16,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
-
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
   const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
   const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/mov', 'video/avi', 'video/webm'];
   const MAX_FILES = 5;

@@ -16,7 +16,7 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
-const UserCard: React.FC<{ user: User; currentUserId?: string }> = ({ user, currentUserId }) => (
+const UserCard: React.FC<{ user: User }> = ({ user }) => (
   <Link to={`/profile/${user.id}`} className="search-user-card">
     <div className="search-user-avatar-wrap">
       {user.profilePicture ? (
@@ -115,7 +115,6 @@ const Search: React.FC = () => {
   };
 
   const hasQuery = inputValue.trim().length > 0;
-  const hasResults = users.length > 0 || posts.length > 0;
 
   return (
     <div className="search-page-v2">
@@ -206,7 +205,7 @@ const Search: React.FC = () => {
             {activeTab === 'users' && (
               <div className="search-results-section">
                 {users.length > 0 ? (
-                  users.map(u => <UserCard key={u.id} user={u} currentUserId={currentUser?.id} />)
+                  users.map(u => <UserCard key={u.id} user={u} />)
                 ) : (
                   <div className="search-no-results">
                     <Icon name="users" size={40} />
