@@ -431,7 +431,7 @@ export const PostCard: React.FC<PostCardProps> = ({
           {/* Current Media */}
           <div
             onClick={(e) => handleMediaClick(currentMediaIndex, e)}
-            style={{ cursor: 'pointer', position: 'relative', width: '100%', maxHeight: '520px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ cursor: 'pointer', position: 'relative', width: '100%', minHeight: '300px', maxHeight: '520px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--paper-200)' }}
             title="Click to view full size"
           >
             {mediaUrls[currentMediaIndex].match(/\.(mp4|webm|mov)$/i) ? (
@@ -441,7 +441,7 @@ export const PostCard: React.FC<PostCardProps> = ({
                 src={resolveMediaUrl(mediaUrls[currentMediaIndex])}
                 alt={`Attachment ${currentMediaIndex + 1}`}
                 loading="lazy"
-                style={{ width: '100%', maxHeight: '520px', objectFit: 'contain', display: 'block', transition: 'transform 0.2s ease' }}
+                style={{ width: '100%', minHeight: '300px', maxHeight: '520px', objectFit: 'contain', display: 'block', transition: 'transform 0.2s ease', color: 'var(--ink-400)', textAlign: 'center', lineHeight: '300px' }}
               />
             )}
           </div>
