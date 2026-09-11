@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { User } from '../../types';
 import { Icon } from '../ui';
-import api from '../../services/api';
 
 interface ProfileHeaderProps {
   user: User;
