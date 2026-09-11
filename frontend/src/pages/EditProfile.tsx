@@ -489,7 +489,7 @@ const EditProfile: React.FC = () => {
           >
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name="eye-off" size={18} /></span>
+                <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name="shield" size={18} /></span>
                 <span style={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--ink-900)' }}>
                   {formData.is18Plus ? '18+ Account' : 'Standard Account'}
                 </span>
