@@ -60,6 +60,8 @@ export interface FileStorageConfig {
     region: string;
     accessKeyId: string;
     secretAccessKey: string;
+    endpoint?: string;
+    publicUrl?: string;
   };
   cloudinaryConfig?: {
     cloudName?: string;

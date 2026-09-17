@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Icon } from '../ui';
 
 interface SearchBarProps {
   onSearch?: (query: string) => void;
@@ -44,7 +45,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
   return (
     <form onSubmit={handleSubmit} className={`search-bar ${className}`} style={{ width: '100%', marginBottom: '24px' }}>
       <div className="search-input-container" style={{ display: 'flex', alignItems: 'center', backgroundColor: 'var(--paper-100)', border: '1px solid var(--border)', borderRadius: '24px', padding: '8px 16px', transition: 'border-color 0.2s, box-shadow 0.2s', position: 'relative' }}>
-        <div className="search-icon" style={{ opacity: 0.6, fontSize: '16px', marginRight: '8px' }}>🔍</div>
+        <div className="search-icon" style={{ opacity: 0.6, display: 'flex', alignItems: 'center', marginRight: '8px', color: 'var(--ink)' }}>
+          <Icon name="search" size={16} />
+        </div>
         <input
           type="text"
           value={query}
@@ -60,7 +63,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             onClick={() => setQuery('')}
             className="search-clear"
             title="Clear search"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', opacity: 0.6, padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', opacity: 0.6, padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink)' }}
           >
             ✕
           </button>

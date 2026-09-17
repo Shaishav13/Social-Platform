@@ -30,6 +30,7 @@
   "author": "Shaishav <sk.shaishav.9@gmail.com> (https://github.com/Shaishav13)",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1134.0",
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.11",
     "@types/node": "^20.10.0",

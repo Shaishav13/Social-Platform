@@ -2,6 +2,8 @@ import { FileStorageConfig, MediaUploadResult } from './types';
 import path from 'path';
 import * as fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+
 function getCloudinaryInstance(): any {
   if (process.env.CLOUDINARY_URL) {
     let raw = process.env.CLOUDINARY_URL.trim().replace(/^["']+|["']+$/g, '');
@@ -29,15 +31,55 @@ function getCloudinaryInstance(): any {
 
 export class FileStorageService {
   private config: FileStorageConfig;
+  private s3Client: S3Client | null = null;
 
   constructor(config?: FileStorageConfig) {
     const hasCloudinary = this.checkCloudinaryConfig();
+    const hasS3 = this.checkS3Config();
+    
     this.config = config || {
-      type: hasCloudinary ? 'cloudinary' : 'local',
-      localPath: process.env.UPLOAD_PATH || './uploads'
+      type: hasS3 ? 's3' : (hasCloudinary ? 'cloudinary' : 'local'),
+      localPath: process.env.UPLOAD_PATH || './uploads',
+      s3Config: hasS3 ? {
+        endpoint: process.env.S3_ENDPOINT,
+        bucket: process.env.S3_BUCKET_NAME!,
+        region: process.env.S3_REGION || 'auto',
+        accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+        publicUrl: process.env.S3_PUBLIC_URL
+      } : undefined
     };
-    if (hasCloudinary) {
+    
+    if (this.config.type === 's3') {
+      this.initS3();
+    } else if (hasCloudinary) {
       this.initCloudinary();
+    }
+  }
+
+  private checkS3Config(): boolean {
+    return !!(
+      process.env.S3_ACCESS_KEY_ID &&
+      process.env.S3_SECRET_ACCESS_KEY &&
+      process.env.S3_BUCKET_NAME &&
+      process.env.S3_ENDPOINT
+    );
+  }
+
+  private initS3(): void {
+    if (!this.config.s3Config) return;
+    try {
+      this.s3Client = new S3Client({
+        region: this.config.s3Config.region,
+        endpoint: this.config.s3Config.endpoint,
+        credentials: {
+          accessKeyId: this.config.s3Config.accessKeyId,
+          secretAccessKey: this.config.s3Config.secretAccessKey,
+        },
+      });
+      console.log(`🪣  S3 Storage configured for bucket: ${this.config.s3Config.bucket}`);
+    } catch (err) {
+      console.error('⚠️ Failed to config S3 Client:', err);
     }
   }
 
@@ -222,13 +264,46 @@ export class FileStorageService {
     filename: string, 
     mimeType: string
   ): Promise<{ filename: string; url: string }> {
-    // S3 implementation would go here
-    // For now, throw an error as S3 SDK is not installed
-    throw new Error('S3 storage not implemented yet. Please use local storage or Cloudinary.');
+    if (!this.s3Client || !this.config.s3Config) {
+      throw new Error('S3 Client is not initialized properly.');
+    }
+
+    const key = `udtabirdie/posts/${filename}`;
+    
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.config.s3Config.bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: mimeType,
+      });
+
+      await this.s3Client.send(command);
+
+      // Return the public URL if configured, otherwise build an S3 URL
+      let url = '';
+      if (this.config.s3Config.publicUrl) {
+        url = `${this.config.s3Config.publicUrl.replace(/\/$/, '')}/${key}`;
+      } else {
+        url = `${this.config.s3Config.endpoint?.replace(/\/$/, '')}/${this.config.s3Config.bucket}/${key}`;
+      }
+
+      return { filename: key, url };
+    } catch (error) {
+      console.error('S3 upload failed:', error);
+      throw error;
+    }
   }
 
   async deleteFile(filename: string): Promise<void> {
-    if (filename.startsWith('udtabirdie/') || this.checkCloudinaryConfig()) {
+    if (this.config.type === 's3') {
+      try {
+        await this.deleteFileFromS3(filename);
+        return;
+      } catch (err) {
+        console.warn('S3 delete failed, trying local fallback:', err);
+      }
+    } else if (filename.startsWith('udtabirdie/') || this.checkCloudinaryConfig()) {
       try {
         const cloudinary = getCloudinaryInstance();
         if (cloudinary) {
@@ -242,8 +317,6 @@ export class FileStorageService {
 
     if (this.config.type === 'local') {
       await this.deleteFileLocally(filename);
-    } else if (this.config.type === 's3') {
-      await this.deleteFileFromS3(filename);
     }
   }
 
@@ -270,8 +343,21 @@ export class FileStorageService {
   }
 
   private async deleteFileFromS3(filename: string): Promise<void> {
-    // S3 deletion implementation would go here
-    throw new Error('S3 storage not implemented yet. Please use local storage.');
+    if (!this.s3Client || !this.config.s3Config) {
+      throw new Error('S3 Client is not initialized properly.');
+    }
+
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: this.config.s3Config.bucket,
+        Key: filename,
+      });
+
+      await this.s3Client.send(command);
+    } catch (error) {
+      console.error('S3 deletion failed:', error);
+      throw error;
+    }
   }
 
   getConfig(): FileStorageConfig {
