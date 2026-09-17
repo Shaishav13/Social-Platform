@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { User } from '../../types';
 import { Icon } from '../ui';
+import { resolveMediaUrl } from '../../utils/media';
 
 interface ProfileHeaderProps {
   user: User;
@@ -29,17 +30,19 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onFollowingClick,
 }) => {
   const [followHovered, setFollowHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   return (
     <header className="wren-profile-header">
       <div className="wren-profile-name-row">
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {user.profilePicture ? (
+          {user.profilePicture && !imgError ? (
             <img
-              src={user.profilePicture}
+              src={resolveMediaUrl(user.profilePicture)}
               alt={user.username}
               className="wren-avatar"
               style={{ width: '64px', height: '64px' }}
+              onError={() => setImgError(true)}
             />
           ) : (
             <div

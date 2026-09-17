@@ -36,6 +36,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const { user: authUser } = useAuth();
@@ -144,12 +145,13 @@ export const PostCard: React.FC<PostCardProps> = ({
       <div className="wren-post-header">
         <div className="wren-author-info">
           <Link to={`/profile/${post.authorId || post.author?.id}`}>
-            {post.author?.profilePicture ? (
+            {post.author?.profilePicture && !imgError ? (
               <img
-                src={post.author.profilePicture}
+                src={resolveMediaUrl(post.author.profilePicture)}
                 alt={post.author.username}
                 className="wren-avatar"
                 style={{ width: '32px', height: '32px' }}
+                onError={() => setImgError(true)}
               />
             ) : (
               <div
