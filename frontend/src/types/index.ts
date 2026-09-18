@@ -12,6 +12,7 @@ export interface User {
   isVerified?: boolean;
   emailVerifiedAt?: string | null;
   dateOfBirth?: string | null;
+  dobLastChangedAt?: string | null;
   followerCount?: number;
   followingCount?: number;
   postCount?: number;

@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button, Icon } from '../components/ui';
 import api from '../services/api';
-import type { RegisterData } from '../types';
 
 type Step = 'username' | 'credentials' | 'verify' | 'age' | 'profile';
 
@@ -31,7 +30,6 @@ const Register: React.FC = () => {
   
   const { register, verifyEmail, updateUser, user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     // If user is already authenticated and they are on the initial steps,
@@ -93,7 +91,7 @@ const Register: React.FC = () => {
 
       setIsLoading(true);
       try {
-        const result = await register({ username, email, password });
+        const result = await register({ username, email, password, confirmPassword });
         if (result.requiresVerification) {
           setStep('verify');
         } else {
@@ -264,7 +262,7 @@ const Register: React.FC = () => {
         </div>
       )}
 
-      <Button type="submit" variant="primary" fullWidth loading={isUsernameChecking}>
+      <Button type="submit" variant="primary" isLoading={isUsernameChecking}>
         Continue
       </Button>
     </form>
@@ -313,7 +311,7 @@ const Register: React.FC = () => {
         {errors.confirmPassword && <span className="type-ui-s" style={{ color: 'var(--rust-alert)', marginTop: '4px', display: 'block' }}>{errors.confirmPassword}</span>}
       </div>
 
-      <Button type="submit" variant="primary" fullWidth loading={isLoading}>
+      <Button type="submit" variant="primary" isLoading={isLoading}>
         Create Account
       </Button>
     </form>
@@ -341,13 +339,12 @@ const Register: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '32px' }}>
-        <Button type="submit" variant="primary" fullWidth loading={isLoading}>
+        <Button type="submit" variant="primary" isLoading={isLoading}>
           Verify Email
         </Button>
         <Button 
           type="button" 
           variant="secondary" 
-          fullWidth 
           onClick={() => {
             setErrors({});
             setStep('credentials');
@@ -410,7 +407,7 @@ const Register: React.FC = () => {
         </div>
       )}
 
-      <Button type="submit" variant="primary" fullWidth loading={isLoading} style={{ marginTop: '24px' }}>
+      <Button type="submit" variant="primary" isLoading={isLoading} style={{ marginTop: '24px' }}>
         Save & Continue
       </Button>
     </form>
@@ -433,7 +430,7 @@ const Register: React.FC = () => {
           {profilePicturePreview ? (
             <img src={profilePicturePreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           ) : (
-            <Icon name="camera" size={32} color="var(--ink-400)" />
+            <Icon name="image" size={32} color="var(--ink-400)" />
           )}
         </div>
         <label className="wren-button wren-button--secondary" style={{ fontSize: '13px', padding: '6px 12px', cursor: 'pointer' }}>
@@ -455,15 +452,15 @@ const Register: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '32px' }}>
-        <Button type="submit" variant="primary" fullWidth loading={isLoading}>
+        <Button type="submit" variant="primary" isLoading={isLoading} style={{ width: '100%' }}>
           Complete Setup
         </Button>
         <Button 
           type="button" 
           variant="secondary" 
-          fullWidth 
           onClick={() => navigate('/feed')}
           disabled={isLoading}
+          style={{ width: '100%' }}
         >
           Skip for now
         </Button>
