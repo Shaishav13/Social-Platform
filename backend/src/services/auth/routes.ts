@@ -210,6 +210,46 @@ router.post('/test-email', async (req: Request, res: Response) => {
   });
 });
 
+// GET /auth/check-username - Real-time username availability check
+router.get('/check-username', async (req: Request, res: Response) => {
+  try {
+    const username = (req.query.username || '').toString().trim();
+    if (!username || username.length < 3) {
+      return res.status(400).json({ success: false, message: 'Username must be at least 3 characters long' });
+    }
+
+    const existingUser = await AuthDatabase.findUserByUsername(username);
+    if (!existingUser) {
+      return res.json({ success: true, available: true });
+    }
+
+    // If taken, generate suggestions
+    const suggestions = [];
+    const baseName = username.replace(/[0-9]+$/, ''); // remove trailing numbers
+    
+    // Generate 3 suggestions
+    let attempts = 0;
+    while (suggestions.length < 3 && attempts < 10) {
+      const suffix = Math.floor(Math.random() * 999) + 1;
+      const suggestion = `${baseName}${suffix}`;
+      const exists = await AuthDatabase.findUserByUsername(suggestion);
+      if (!exists && suggestion !== username && !suggestions.includes(suggestion)) {
+        suggestions.push(suggestion);
+      }
+      attempts++;
+    }
+
+    return res.json({
+      success: true,
+      available: false,
+      suggestions
+    });
+  } catch (error: any) {
+    console.error('Check username error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 // POST /auth/register
 router.post('/register', registerLimiter, async (req: Request, res: Response) => {
   try {

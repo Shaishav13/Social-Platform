@@ -20,6 +20,21 @@ const Settings: React.FC = () => {
   const [plus18Success, setPlus18Success] = useState('');
   const [plus18Error, setPlus18Error] = useState('');
 
+  // Calculate if user is 18+ based on their dateOfBirth
+  const isEligibleFor18Plus = (): boolean => {
+    if (!user?.dateOfBirth) return false;
+    const today = new Date();
+    const birthDate = new Date(user.dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age >= 18;
+  };
+
+  const show18PlusSetting = isEligibleFor18Plus();
+
   // Delete Account Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
@@ -265,30 +280,32 @@ const Settings: React.FC = () => {
         </div>
 
         {/* 18+ Toggle Section */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name={is18Plus ? 'shield' : 'check'} size={24} /></span>
-              <h3 className="type-display-m" style={{ margin: 0, fontSize: '1.1rem' }}>
-                18+ User (NSFW Content)
-              </h3>
+        {show18PlusSetting && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: '32px', paddingTop: '24px', borderTop: '1px solid var(--border)' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name={is18Plus ? 'shield' : 'check'} size={24} /></span>
+                <h3 className="type-display-m" style={{ margin: 0, fontSize: '1.1rem' }}>
+                  18+ User (NSFW Content)
+                </h3>
+              </div>
+              <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: 0, maxWidth: '85%' }}>
+                Turn this on to mark your account as 18+ and view 18+ content from other authors you follow or who have public accounts. If off, NSFW content is hidden from your feed.
+              </p>
             </div>
-            <p className="type-ui-s" style={{ color: 'var(--ink-600)', margin: 0, maxWidth: '85%' }}>
-              Turn this on to mark your account as 18+ and view 18+ content from other authors you follow or who have public accounts. If off, NSFW content is hidden from your feed.
-            </p>
-          </div>
 
-          <label className="wren-switch" style={{ flexShrink: 0, marginTop: '4px' }}>
-            <input
-              type="checkbox"
-              id="settings-18plus-toggle"
-              checked={is18Plus}
-              onChange={(e) => handleToggle18Plus(e.target.checked)}
-              disabled={isUpdating18Plus}
-            />
-            <span className="wren-switch-slider"></span>
-          </label>
-        </div>
+            <label className="wren-switch" style={{ flexShrink: 0, marginTop: '4px' }}>
+              <input
+                type="checkbox"
+                id="settings-18plus-toggle"
+                checked={is18Plus}
+                onChange={(e) => handleToggle18Plus(e.target.checked)}
+                disabled={isUpdating18Plus}
+              />
+              <span className="wren-switch-slider"></span>
+            </label>
+          </div>
+        )}
 
         {plus18Success && (
           <div className="wren-admin-alert wren-admin-alert--success" style={{ margin: '14px 0' }} role="status">

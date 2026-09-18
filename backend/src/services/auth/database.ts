@@ -93,6 +93,7 @@ export class AuthDatabase {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT false;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP WITH TIME ZONE;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS is_18_plus BOOLEAN DEFAULT false;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;
     `;
 
     // One-time migration: accounts created BEFORE the email-verification system was introduced
@@ -144,6 +145,7 @@ export class AuthDatabase {
       isRestricted: Boolean(row.is_restricted),
       isVerified: Boolean(row.is_verified),
       emailVerifiedAt: row.email_verified_at ? new Date(row.email_verified_at) : null,
+      dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -172,6 +174,7 @@ export class AuthDatabase {
       isRestricted: Boolean(row.is_restricted),
       isVerified: Boolean(row.is_verified),
       emailVerifiedAt: row.email_verified_at ? new Date(row.email_verified_at) : null,
+      dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
       is18Plus: Boolean(row.is_18_plus),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -201,6 +204,7 @@ export class AuthDatabase {
       isRestricted: Boolean(row.is_restricted),
       isVerified: Boolean(row.is_verified),
       emailVerifiedAt: row.email_verified_at ? new Date(row.email_verified_at) : null,
+      dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
       is18Plus: Boolean(row.is_18_plus),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -209,8 +213,8 @@ export class AuthDatabase {
 
   static async createUser(userData: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
     const result = await DatabaseConnection.query(
-      `INSERT INTO users (username, email, password_hash, profile_picture, bio, is_private, role, is_restricted, is_verified, email_verified_at, is_18_plus)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO users (username, email, password_hash, profile_picture, bio, is_private, role, is_restricted, is_verified, email_verified_at, is_18_plus, date_of_birth)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         userData.username,
@@ -224,6 +228,7 @@ export class AuthDatabase {
         userData.isVerified || false,
         userData.emailVerifiedAt || null,
         userData.is18Plus || false,
+        userData.dateOfBirth || null,
       ]
     ) as any;
 
@@ -240,6 +245,7 @@ export class AuthDatabase {
       isRestricted: Boolean(row.is_restricted),
       isVerified: Boolean(row.is_verified),
       emailVerifiedAt: row.email_verified_at ? new Date(row.email_verified_at) : null,
+      dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
       is18Plus: Boolean(row.is_18_plus),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -335,6 +341,11 @@ export class AuthDatabase {
       values.push(updateData.is18Plus);
     }
 
+    if (updateData.dateOfBirth !== undefined) {
+      updates.push(`date_of_birth = $${++paramCount}`);
+      values.push(updateData.dateOfBirth);
+    }
+
     if (updates.length === 0) {
       return this.findUserById(userId);
     }
@@ -358,6 +369,7 @@ export class AuthDatabase {
       bio: row.bio,
       isPrivate: row.is_private,
       is18Plus: Boolean(row.is_18_plus),
+      dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

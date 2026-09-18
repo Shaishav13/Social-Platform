@@ -47,6 +47,21 @@ const EditProfile: React.FC = () => {
     }
   }, [user]);
 
+  // Calculate if user is 18+ based on their dateOfBirth
+  const isEligibleFor18Plus = (): boolean => {
+    if (!user?.dateOfBirth) return false;
+    const today = new Date();
+    const birthDate = new Date(user.dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age >= 18;
+  };
+
+  const show18PlusSetting = isEligibleFor18Plus();
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -473,64 +488,66 @@ const EditProfile: React.FC = () => {
           </div>
 
           {/* 18+ Setting */}
-          <div
-            style={{
-              padding: '16px 18px',
-              backgroundColor: 'var(--paper-200)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)',
-              marginTop: '8px',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: '16px'
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name="shield" size={18} /></span>
-                <span style={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--ink-900)' }}>
-                  {formData.is18Plus ? '18+ Account' : 'Standard Account'}
-                </span>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    backgroundColor: formData.is18Plus ? 'rgba(162, 63, 46, 0.12)' : 'rgba(75, 107, 78, 0.12)',
-                    color: formData.is18Plus ? 'var(--rust-alert)' : 'var(--moss-600)',
-                    border: `1px solid ${formData.is18Plus ? 'var(--rust-alert)' : 'var(--moss-600)'}`
-                  }}
-                >
-                  {formData.is18Plus ? 'NSFW' : 'SFW'}
-                </span>
+          {show18PlusSetting && (
+            <div
+              style={{
+                padding: '16px 18px',
+                backgroundColor: 'var(--paper-200)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                marginTop: '8px',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: '16px'
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name="shield" size={18} /></span>
+                  <span style={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--ink-900)' }}>
+                    {formData.is18Plus ? '18+ Account' : 'Standard Account'}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      backgroundColor: formData.is18Plus ? 'rgba(162, 63, 46, 0.12)' : 'rgba(75, 107, 78, 0.12)',
+                      color: formData.is18Plus ? 'var(--rust-alert)' : 'var(--moss-600)',
+                      border: `1px solid ${formData.is18Plus ? 'var(--rust-alert)' : 'var(--moss-600)'}`
+                    }}
+                  >
+                    {formData.is18Plus ? 'NSFW' : 'SFW'}
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--ink-600)', lineHeight: 1.45 }}>
+                  {formData.is18Plus
+                    ? 'Your account contains explicit material. Non-18+ users will not see your posts in their feed.'
+                    : 'Your account is suitable for all audiences.'}
+                </p>
               </div>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--ink-600)', lineHeight: 1.45 }}>
-                {formData.is18Plus
-                  ? 'Your account contains explicit material. Non-18+ users will not see your posts in their feed.'
-                  : 'Your account is suitable for all audiences.'}
-              </p>
+              <label className="wren-switch" style={{ marginTop: '2px', flexShrink: 0 }}>
+                <input
+                  type="checkbox"
+                  id="is18Plus"
+                  name="is18Plus"
+                  checked={formData.is18Plus}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, is18Plus: e.target.checked }));
+                    setError('');
+                    setSuccess('');
+                  }}
+                  disabled={isUpdating}
+                />
+                <span className="wren-switch-slider"></span>
+              </label>
             </div>
-            <label className="wren-switch" style={{ marginTop: '2px', flexShrink: 0 }}>
-              <input
-                type="checkbox"
-                id="is18Plus"
-                name="is18Plus"
-                checked={formData.is18Plus}
-                onChange={(e) => {
-                  setFormData(prev => ({ ...prev, is18Plus: e.target.checked }));
-                  setError('');
-                  setSuccess('');
-                }}
-                disabled={isUpdating}
-              />
-              <span className="wren-switch-slider"></span>
-            </label>
-          </div>
+          )}
 
           {/* Form Actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>

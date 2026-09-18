@@ -197,12 +197,12 @@ a {
   position: relative;
 }
 
-/* Desktop Rail (Left: 56px collapsed or 230px expanded) */
 .wren-rail {
   height: 100vh;
   position: sticky;
   top: 0;
   left: 0;
+  align-self: flex-start;
   background-color: var(--paper-200);
   border-right: 1px solid var(--border);
   display: flex;
@@ -3420,7 +3420,7 @@ button.wren-btn {
 
 /* ── Global overflow guard ── */
 html, body, #root {
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
 }
 

@@ -55,9 +55,7 @@ function App() {
               </PublicRoute>
             } />
             <Route path="/register" element={
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
+              <Register />
             } />
             <Route path="/verify-email" element={
               <PublicRoute>

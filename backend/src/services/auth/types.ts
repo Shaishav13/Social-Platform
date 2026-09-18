@@ -11,6 +11,7 @@ export interface User {
   isRestricted?: boolean;
   isVerified?: boolean;
   emailVerifiedAt?: Date | null;
+  dateOfBirth?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +39,7 @@ export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
+  dateOfBirth?: string | undefined; // optional for backward compatibility, but required in new flow
   bio?: string | undefined;
 }
 
