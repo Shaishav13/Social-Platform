@@ -41,6 +41,22 @@ const Settings: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  // Email Change State
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [emailChangeStep, setEmailChangeStep] = useState<'request' | 'verify'>('request');
+  const [emailChangeError, setEmailChangeError] = useState('');
+  const [emailChangeSuccess, setEmailChangeSuccess] = useState('');
+  const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
+
+  // DOB Change State
+  const [isChangingDob, setIsChangingDob] = useState(false);
+  const [newDob, setNewDob] = useState(user?.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '');
+  const [dobChangeError, setDobChangeError] = useState('');
+  const [dobChangeSuccess, setDobChangeSuccess] = useState('');
+  const [isSubmittingDob, setIsSubmittingDob] = useState(false);
+
   const handleTogglePrivacy = async (newVal: boolean) => {
     setIsUpdatingPrivacy(true);
     setPrivacyError('');
@@ -113,11 +129,100 @@ const Settings: React.FC = () => {
       logout();
       navigate('/login');
     } catch (err: any) {
-      console.error('Account deletion error:', err);
+      console.error('Failed to delete account:', err);
       setDeleteError(err.response?.data?.message || 'Failed to delete account. Please verify your password.');
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleRequestEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmail || !newEmail.includes('@')) {
+      setEmailChangeError('Please enter a valid email address.');
+      return;
+    }
+    setIsSubmittingEmail(true);
+    setEmailChangeError('');
+    setEmailChangeSuccess('');
+
+    try {
+      const response = await api.post('/auth/profile/email/request', { newEmail });
+      if (response.data.success) {
+        setEmailChangeStep('verify');
+        setEmailChangeSuccess(response.data.message);
+      }
+    } catch (err: any) {
+      setEmailChangeError(err.response?.data?.message || 'Failed to request email change.');
+    } finally {
+      setIsSubmittingEmail(false);
+    }
+  };
+
+  const handleVerifyEmailChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailOtp || emailOtp.length !== 6) {
+      setEmailChangeError('Please enter a valid 6-digit verification code.');
+      return;
+    }
+    setIsSubmittingEmail(true);
+    setEmailChangeError('');
+    setEmailChangeSuccess('');
+
+    try {
+      const response = await api.post('/auth/profile/email/verify', { otp: emailOtp });
+      if (response.data.success) {
+        updateUser(response.data.data);
+        setIsChangingEmail(false);
+        setEmailChangeStep('request');
+        setNewEmail('');
+        setEmailOtp('');
+        // Show success somewhere or just alert
+        alert('Email successfully changed!');
+      }
+    } catch (err: any) {
+      setEmailChangeError(err.response?.data?.message || 'Failed to verify email change.');
+    } finally {
+      setIsSubmittingEmail(false);
+    }
+  };
+
+  const handleUpdateDob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDob) {
+      setDobChangeError('Please enter a valid date of birth.');
+      return;
+    }
+    setIsSubmittingDob(true);
+    setDobChangeError('');
+    setDobChangeSuccess('');
+
+    try {
+      const response = await api.put('/profile', { dateOfBirth: newDob });
+      if (response.data.success) {
+        updateUser(response.data.data);
+        setIsChangingDob(false);
+        setDobChangeSuccess('Date of birth updated successfully.');
+      }
+    } catch (err: any) {
+      setDobChangeError(err.response?.data?.message || 'Failed to update Date of Birth.');
+    } finally {
+      setIsSubmittingDob(false);
+    }
+  };
+
+  // Determine if DOB is locked
+  const isDobLocked = (): boolean => {
+    if (!user?.dobLastChangedAt) return false;
+    const daysSinceLastChange = (Date.now() - new Date(user.dobLastChangedAt).getTime()) / (1000 * 60 * 60 * 24);
+    return daysSinceLastChange < 120; // 4 months
+  };
+
+  const getDobUnlockDate = (): string => {
+    if (!user?.dobLastChangedAt) return '';
+    const unlockDate = new Date(user.dobLastChangedAt);
+    unlockDate.setDate(unlockDate.getDate() + 120);
+    return unlockDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   if (!user) {
@@ -168,6 +273,135 @@ const Settings: React.FC = () => {
         <p className="type-ui-m" style={{ color: 'var(--ink-600)', margin: 0 }}>
           Manage your correspondence privacy, reading appearance, and account preferences.
         </p>
+      </div>
+
+      {/* SECTION 0: ACCOUNT INFORMATION */}
+      <div className="wren-card" style={{ marginBottom: '28px' }}>
+        <h2 className="type-display-m" style={{ margin: '0 0 16px', fontSize: '1.25rem' }}>
+          Account Information
+        </h2>
+
+        {/* Email Setting */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--ink-900)' }}>Email Address</span>
+            {!isChangingEmail && (
+              <button 
+                type="button" 
+                className="wren-button wren-button--ghost" 
+                style={{ fontSize: '13px', padding: '4px 8px' }}
+                onClick={() => setIsChangingEmail(true)}
+              >
+                Change
+              </button>
+            )}
+          </div>
+          
+          {!isChangingEmail ? (
+            <div style={{ fontSize: '15px', color: 'var(--ink-600)' }}>{user.email}</div>
+          ) : (
+            <div style={{ backgroundColor: 'var(--paper-200)', padding: '16px', borderRadius: 'var(--radius-sm)' }}>
+              {emailChangeStep === 'request' ? (
+                <form onSubmit={handleRequestEmailChange}>
+                  <label className="wren-label" style={{ marginBottom: '8px' }}>New Email Address</label>
+                  <input
+                    type="email"
+                    className="wren-input"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="Enter new email address"
+                    required
+                    style={{ marginBottom: '12px' }}
+                  />
+                  {emailChangeError && <div className="wren-error" style={{ marginBottom: '12px' }}>{emailChangeError}</div>}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" className="wren-button wren-button--ghost" onClick={() => setIsChangingEmail(false)}>Cancel</button>
+                    <button type="submit" className="wren-button wren-button--wine" disabled={isSubmittingEmail}>
+                      {isSubmittingEmail ? 'Sending...' : 'Send Verification Code'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyEmailChange}>
+                  <div className="wren-success" style={{ marginBottom: '12px', fontSize: '13.5px' }}>{emailChangeSuccess}</div>
+                  <label className="wren-label" style={{ marginBottom: '8px' }}>Verification Code</label>
+                  <input
+                    type="text"
+                    className="wren-input"
+                    value={emailOtp}
+                    onChange={(e) => setEmailOtp(e.target.value)}
+                    placeholder="Enter 6-digit code"
+                    maxLength={6}
+                    required
+                    style={{ marginBottom: '12px' }}
+                  />
+                  {emailChangeError && <div className="wren-error" style={{ marginBottom: '12px' }}>{emailChangeError}</div>}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" className="wren-button wren-button--ghost" onClick={() => setEmailChangeStep('request')}>Back</button>
+                    <button type="submit" className="wren-button wren-button--wine" disabled={isSubmittingEmail}>
+                      {isSubmittingEmail ? 'Verifying...' : 'Verify & Change Email'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 24px' }} />
+
+        {/* Date of Birth Setting */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--ink-900)' }}>Date of Birth</span>
+            {!isChangingDob && !isDobLocked() && (
+              <button 
+                type="button" 
+                className="wren-button wren-button--ghost" 
+                style={{ fontSize: '13px', padding: '4px 8px' }}
+                onClick={() => setIsChangingDob(true)}
+              >
+                Change
+              </button>
+            )}
+          </div>
+          
+          {isDobLocked() && (
+            <div style={{ fontSize: '12.5px', color: 'var(--ochre-600)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Icon name="lock" size={14} /> Date of birth is locked until {getDobUnlockDate()}.
+            </div>
+          )}
+
+          {!isChangingDob ? (
+            <div style={{ fontSize: '15px', color: 'var(--ink-600)' }}>
+              {user.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not set'}
+            </div>
+          ) : (
+            <form onSubmit={handleUpdateDob} style={{ backgroundColor: 'var(--paper-200)', padding: '16px', borderRadius: 'var(--radius-sm)' }}>
+              <label className="wren-label" style={{ marginBottom: '8px' }}>New Date of Birth</label>
+              <input
+                type="date"
+                className="wren-input"
+                value={newDob}
+                onChange={(e) => setNewDob(e.target.value)}
+                required
+                max={new Date().toISOString().split('T')[0]}
+                style={{ marginBottom: '12px' }}
+              />
+              <p style={{ fontSize: '12.5px', color: 'var(--ink-600)', marginBottom: '12px' }}>
+                Note: You can only change your date of birth once every 4 months.
+              </p>
+              {dobChangeError && <div className="wren-error" style={{ marginBottom: '12px' }}>{dobChangeError}</div>}
+              {dobChangeSuccess && <div className="wren-success" style={{ marginBottom: '12px', fontSize: '13.5px' }}>{dobChangeSuccess}</div>}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" className="wren-button wren-button--ghost" onClick={() => setIsChangingDob(false)}>Cancel</button>
+                <button type="submit" className="wren-button wren-button--wine" disabled={isSubmittingDob}>
+                  {isSubmittingDob ? 'Saving...' : 'Save Date of Birth'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
 
       {/* SECTION 1: ACCOUNT PRIVACY & VISIBILITY */}

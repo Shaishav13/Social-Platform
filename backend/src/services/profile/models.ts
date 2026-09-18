@@ -62,6 +62,7 @@ export class ProfileModel {
       isPrivate: user.isPrivate,
       is18Plus: user.is18Plus,
       dateOfBirth: user.dateOfBirth,
+      dobLastChangedAt: user.dobLastChangedAt,
       isFollowing,
       createdAt: user.createdAt,
     };
@@ -99,6 +100,7 @@ export class ProfileModel {
       isPrivate: user.isPrivate,
       is18Plus: user.is18Plus,
       dateOfBirth: user.dateOfBirth,
+      dobLastChangedAt: user.dobLastChangedAt,
       settings,
       createdAt: user.createdAt,
     };
@@ -120,6 +122,19 @@ export class ProfileModel {
       }
     }
 
+    // Enforce 4-month (120 days) cooldown for DOB changes
+    let shouldUpdateDobTimestamp = false;
+    if (updateData.dateOfBirth !== undefined) {
+      const user = await AuthDatabase.findUserById(userId);
+      if (user && user.dobLastChangedAt) {
+        const daysSinceLastChange = (Date.now() - user.dobLastChangedAt.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceLastChange < 120) {
+          throw new Error('Date of birth can only be changed once every 4 months');
+        }
+      }
+      shouldUpdateDobTimestamp = true;
+    }
+
     // Update user data
     const updatedUser = await AuthDatabase.updateUser(userId, {
       ...(updateData.username && { username: updateData.username }),
@@ -128,6 +143,7 @@ export class ProfileModel {
       ...(updateData.settings?.isPrivate !== undefined && { isPrivate: updateData.settings.isPrivate }),
       ...(updateData.is18Plus !== undefined && { is18Plus: updateData.is18Plus }),
       ...(updateData.dateOfBirth !== undefined && { dateOfBirth: new Date(updateData.dateOfBirth) }),
+      ...(shouldUpdateDobTimestamp && { dobLastChangedAt: new Date() }),
     });
 
     // Update profile settings if provided

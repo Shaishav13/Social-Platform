@@ -870,7 +870,7 @@ router.delete('/account', authenticateToken, async (req: Request, res: Response)
 router.put('/profile', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.userId;
-    const { username, bio, isPrivate } = req.body;
+    const { username, bio, isPrivate, is18Plus } = req.body;
 
     // Validate input
     if (username && (username.length < 3 || username.length > 50)) {
@@ -903,6 +903,7 @@ router.put('/profile', authenticateToken, async (req: Request, res: Response) =>
     if (username) updateData.username = username.trim();
     if (bio !== undefined) updateData.bio = bio.trim();
     if (isPrivate !== undefined) updateData.isPrivate = Boolean(isPrivate);
+    if (is18Plus !== undefined) updateData.is18Plus = Boolean(is18Plus);
 
     const updatedUser = await AuthDatabase.updateUser(userId, updateData);
 
@@ -929,6 +930,97 @@ router.put('/profile', authenticateToken, async (req: Request, res: Response) =>
       success: false,
       message: 'Internal server error',
     });
+  }
+});
+
+// POST /auth/profile/email/request - Request email change
+router.post('/profile/email/request', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    const { newEmail } = req.body;
+
+    if (!newEmail || !newEmail.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Valid new email is required' });
+    }
+
+    const email = sanitizeInput(newEmail.toLowerCase());
+
+    // Ensure the new email is not already taken
+    const existingUser = await AuthDatabase.findUserByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: 'Email address is already in use' });
+    }
+
+    const user = await UserModel.findUserById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const otp = UserModel.generateOTP();
+    const otpHash = UserModel.hashOtp(otp);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+    await AuthDatabase.createEmailChangeRequest(userId, email, otpHash, expiresAt);
+    await EmailService.sendVerificationOtp(email, user.username, otp);
+
+    res.json({
+      success: true,
+      message: 'Verification code sent to the new email address.',
+    });
+  } catch (error: any) {
+    console.error('Email change request error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// POST /auth/profile/email/verify - Verify email change OTP
+router.post('/profile/email/verify', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    const { otp } = req.body;
+
+    if (!otp) {
+      return res.status(400).json({ success: false, message: 'OTP is required' });
+    }
+
+    const verifRecord = await AuthDatabase.findActiveEmailChangeRequest(userId);
+    if (!verifRecord) {
+      return res.status(400).json({ success: false, message: 'No active email change request or code expired.' });
+    }
+
+    if (verifRecord.attempts >= verifRecord.max_attempts) {
+      await AuthDatabase.deleteEmailChangeRequest(verifRecord.id);
+      return res.status(400).json({ success: false, message: 'Maximum attempts exceeded. Request a new code.' });
+    }
+
+    const isMatch = UserModel.verifyOtpHash(otp.trim(), verifRecord.otp_hash);
+    if (!isMatch) {
+      const attempts = await AuthDatabase.incrementEmailChangeAttempts(verifRecord.id);
+      const remaining = Math.max(0, verifRecord.max_attempts - attempts);
+      if (remaining <= 0) {
+        await AuthDatabase.deleteEmailChangeRequest(verifRecord.id);
+        return res.status(400).json({ success: false, message: 'Maximum attempts exceeded. Request a new code.' });
+      }
+      return res.status(400).json({ success: false, message: `Invalid code. ${remaining} attempt(s) remaining.` });
+    }
+
+    // OTP matched! Update email and delete request
+    await AuthDatabase.updateUserEmail(userId, verifRecord.new_email);
+    await AuthDatabase.deleteEmailChangeRequest(verifRecord.id);
+
+    // Fetch updated user to return
+    const updatedUser = await UserModel.findUserById(userId);
+    if (!updatedUser) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    const { passwordHash, ...userResponse } = updatedUser;
+
+    res.json({
+      success: true,
+      message: 'Email address updated successfully!',
+      data: userResponse
+    });
+  } catch (error: any) {
+    console.error('Email change verify error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 

@@ -57,6 +57,19 @@ export class AuthDatabase {
       );
     `;
 
+    const createEmailChangeRequestsTable = `
+      CREATE TABLE IF NOT EXISTS email_change_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        new_email VARCHAR(255) NOT NULL,
+        otp_hash VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        attempts INT NOT NULL DEFAULT 0,
+        max_attempts INT NOT NULL DEFAULT 5,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
     const createIndexes = `
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -94,6 +107,7 @@ export class AuthDatabase {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP WITH TIME ZONE;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS is_18_plus BOOLEAN DEFAULT false;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth DATE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS dob_last_changed_at TIMESTAMP WITH TIME ZONE;
     `;
 
     // One-time migration: accounts created BEFORE the email-verification system was introduced
@@ -110,6 +124,7 @@ export class AuthDatabase {
     await DatabaseConnection.query(createSessionsTable);
     await DatabaseConnection.query(createPasswordResetTable);
     await DatabaseConnection.query(createEmailVerificationsTable);
+    await DatabaseConnection.query(createEmailChangeRequestsTable);
     await DatabaseConnection.query(createIndexes);
     await DatabaseConnection.query(createUpdatedAtTrigger);
 
@@ -146,6 +161,7 @@ export class AuthDatabase {
       isVerified: Boolean(row.is_verified),
       emailVerifiedAt: row.email_verified_at ? new Date(row.email_verified_at) : null,
       dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
+      dobLastChangedAt: row.dob_last_changed_at ? new Date(row.dob_last_changed_at) : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -175,6 +191,7 @@ export class AuthDatabase {
       isVerified: Boolean(row.is_verified),
       emailVerifiedAt: row.email_verified_at ? new Date(row.email_verified_at) : null,
       dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
+      dobLastChangedAt: row.dob_last_changed_at ? new Date(row.dob_last_changed_at) : null,
       is18Plus: Boolean(row.is_18_plus),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -205,6 +222,7 @@ export class AuthDatabase {
       isVerified: Boolean(row.is_verified),
       emailVerifiedAt: row.email_verified_at ? new Date(row.email_verified_at) : null,
       dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
+      dobLastChangedAt: row.dob_last_changed_at ? new Date(row.dob_last_changed_at) : null,
       is18Plus: Boolean(row.is_18_plus),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -346,6 +364,11 @@ export class AuthDatabase {
       values.push(updateData.dateOfBirth);
     }
 
+    if (updateData.dobLastChangedAt !== undefined) {
+      updates.push(`dob_last_changed_at = $${++paramCount}`);
+      values.push(updateData.dobLastChangedAt);
+    }
+
     if (updates.length === 0) {
       return this.findUserById(userId);
     }
@@ -370,6 +393,7 @@ export class AuthDatabase {
       isPrivate: row.is_private,
       is18Plus: Boolean(row.is_18_plus),
       dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth) : null,
+      dobLastChangedAt: row.dob_last_changed_at ? new Date(row.dob_last_changed_at) : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -511,6 +535,68 @@ export class AuthDatabase {
     await DatabaseConnection.query(
       'UPDATE users SET is_verified = true, email_verified_at = CURRENT_TIMESTAMP WHERE id = $1',
       [userId]
+    );
+  }
+
+  // ── Email Change Requests ───────────────────────────────────────────────────
+
+  static async createEmailChangeRequest(
+    userId: string,
+    newEmail: string,
+    otpHash: string,
+    expiresAt: Date
+  ): Promise<any> {
+    await DatabaseConnection.query(
+      'DELETE FROM email_change_requests WHERE user_id = $1 OR new_email = $2',
+      [userId, newEmail.toLowerCase()]
+    );
+
+    const result = await DatabaseConnection.query(
+      `INSERT INTO email_change_requests (user_id, new_email, otp_hash, expires_at, attempts, max_attempts)
+       VALUES ($1, $2, $3, $4, 0, 5)
+       RETURNING *`,
+      [userId, newEmail.toLowerCase(), otpHash, expiresAt]
+    ) as any;
+
+    return result.rows[0];
+  }
+
+  static async findActiveEmailChangeRequest(userId: string): Promise<any | null> {
+    const result = await DatabaseConnection.query(
+      `SELECT * FROM email_change_requests 
+       WHERE user_id = $1 AND expires_at > CURRENT_TIMESTAMP
+       ORDER BY created_at DESC LIMIT 1`,
+      [userId]
+    ) as any;
+
+    if (result.rows.length === 0) return null;
+    return result.rows[0];
+  }
+
+  static async incrementEmailChangeAttempts(id: string): Promise<number> {
+    const result = await DatabaseConnection.query(
+      `UPDATE email_change_requests 
+       SET attempts = attempts + 1 
+       WHERE id = $1 
+       RETURNING attempts`,
+      [id]
+    ) as any;
+
+    if (result.rows.length === 0) return 0;
+    return result.rows[0].attempts;
+  }
+
+  static async deleteEmailChangeRequest(id: string): Promise<void> {
+    await DatabaseConnection.query(
+      'DELETE FROM email_change_requests WHERE id = $1',
+      [id]
+    );
+  }
+
+  static async updateUserEmail(userId: string, newEmail: string): Promise<void> {
+    await DatabaseConnection.query(
+      'UPDATE users SET email = $1, email_verified_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [newEmail.toLowerCase(), userId]
     );
   }
 }

@@ -27,6 +27,7 @@ export interface PublicProfile {
   isPrivate: boolean;
   is18Plus?: boolean;
   dateOfBirth?: Date | null;
+  dobLastChangedAt?: Date | null;
   isFollowing?: boolean | undefined; // Only present when viewed by another user
   createdAt: Date;
 }
