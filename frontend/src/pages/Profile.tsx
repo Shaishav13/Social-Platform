@@ -30,12 +30,11 @@ const Profile: React.FC = () => {
   const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  const isOwnProfile = currentUser?.id === id;
+  const isOwnProfile = currentUser?.id === id || (profileUser ? currentUser?.id === profileUser.id : false);
 
   useEffect(() => {
     if (id) {
       loadProfile();
-      loadUserPosts();
     }
   }, [id]);
 
@@ -78,6 +77,9 @@ const Profile: React.FC = () => {
       setFollowingCount(userData.followingCount || 0);
       setPostCount(userData.postCount || 0);
       setError('');
+      
+      // Load user posts with resolved UUID
+      loadUserPosts(userData.id);
     } catch (err: any) {
       console.error('Failed to load profile:', err);
       setError('Failed to load profile. Please try again.');
@@ -86,10 +88,12 @@ const Profile: React.FC = () => {
     }
   };
 
-  const loadUserPosts = async () => {
+  const loadUserPosts = async (targetAuthorId?: string) => {
+    const authorId = targetAuthorId || profileUser?.id || id;
+    if (!authorId) return;
     try {
       setIsPostsLoading(true);
-      const response = await api.get(`/content/posts?authorId=${id}&limit=20`);
+      const response = await api.get(`/content/posts?authorId=${authorId}&limit=20`);
       setPosts(response.data.posts || []);
     } catch (err: any) {
       console.error('Failed to load user posts:', err);
@@ -103,7 +107,8 @@ const Profile: React.FC = () => {
   };
 
   const handleFollowToggle = async () => {
-    if (!id || isFollowLoading) return;
+    const targetId = profileUser?.id || id;
+    if (!targetId || isFollowLoading) return;
 
     setIsFollowLoading(true);
 

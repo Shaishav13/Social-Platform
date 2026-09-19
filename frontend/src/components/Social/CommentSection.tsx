@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import type { Comment, User } from '../../types';
 import api from '../../services/api';
+import { RichText } from '../ui/RichText';
 
 interface CommentSectionProps {
   postId: string;
@@ -10,174 +11,213 @@ interface CommentSectionProps {
   onCommentCountChange?: (newCount: number) => void;
 }
 
-const CommentSection: React.FC<CommentSectionProps> = ({ 
-  postId, 
-  currentUser,
-  highlightCommentId,
-  onCommentCountChange 
+// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function resolveProfilePic(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${url}`;
+}
+
+interface AvatarProps {
+  username?: string;
+  profilePicture?: string | null;
+  size?: number;
+}
+
+const Avatar: React.FC<AvatarProps> = ({ username, profilePicture, size = 36 }) => {
+  const [imgErr, setImgErr] = useState(false);
+  const resolved = resolveProfilePic(profilePicture);
+  const initial = (username || 'U').charAt(0).toUpperCase();
+
+  if (resolved && !imgErr) {
+    return (
+      <img
+        src={resolved}
+        alt={username}
+        onError={() => setImgErr(true)}
+        style={{
+          width: size, height: size, borderRadius: '50%', objectFit: 'cover',
+          flexShrink: 0, border: '1.5px solid var(--border)',
+        }}
+      />
+    );
+  }
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      backgroundColor: 'var(--wine-900, #5a1a2a)', color: 'var(--paper-100)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontWeight: 700, fontSize: Math.max(12, Math.floor(size * 0.38)) + 'px',
+      border: '1.5px solid var(--border)',
+    }}>
+      {initial}
+    </div>
+  );
+};
+
+// â”€â”€ CommentItem â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+interface CommentItemProps {
+  comment: Comment;
+  isReply?: boolean;
+  currentUser?: User;
+  postId: string;
+  isHighlighted?: boolean;
+  highlightRef?: React.RefObject<HTMLDivElement | null>;
+  onReplyAdded?: (parentId: string, reply: Comment) => void;
+}
+
+const CommentItem: React.FC<CommentItemProps> = ({
+  comment, isReply = false, currentUser, postId,
+  isHighlighted = false, highlightRef, onReplyAdded,
 }) => {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
-  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
-  const highlightedCommentRef = useRef<HTMLDivElement>(null);
+  const [showReplyForm, setShowReplyForm] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+  const [isLiked, setIsLiked] = useState(comment.isLiked || false);
+  const [likeCount, setLikeCount] = useState(comment.likeCount || 0);
+  const [showAllReplies, setShowAllReplies] = useState(false);
+  const REPLIES_TO_SHOW = 3;
+  const replies = comment.replies || [];
+  const visibleReplies = showAllReplies ? replies : replies.slice(0, REPLIES_TO_SHOW);
+  const hiddenCount = replies.length - REPLIES_TO_SHOW;
 
-  useEffect(() => {
-    loadComments();
-  }, [postId]);
-
-  useEffect(() => {
-    // Scroll to highlighted comment after comments are loaded
-    if (highlightCommentId && comments.length > 0 && highlightedCommentRef.current) {
-      setTimeout(() => {
-        highlightedCommentRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
-        });
-      }, 100);
-    }
-  }, [highlightCommentId, comments]);
-
-  const loadComments = async () => {
-    setIsLoading(true);
+  const handleLike = async () => {
+    if (!currentUser) return;
+    const prev = isLiked;
+    setIsLiked(!prev);
+    setLikeCount(c => prev ? c - 1 : c + 1);
     try {
-      const response = await api.get(`/social/posts/${postId}/comments`);
-      setComments(response.data.data || []);
-    } catch (error) {
-      console.error('Failed to load comments:', error);
-    } finally {
-      setIsLoading(false);
+      await api.post(`/social/comments/${comment.id}/like`);
+    } catch {
+      setIsLiked(prev);
+      setLikeCount(c => prev ? c + 1 : c - 1);
     }
   };
 
-  const handleSubmitComment = async (e: React.FormEvent) => {
+  const handleSubmitReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newComment.trim() || isSubmitting) return;
-
-    setIsSubmitting(true);
-    try {
-      const response = await api.post(`/social/posts/${postId}/comments`, {
-        content: newComment.trim()
-      });
-
-      const comment = response.data.data;
-      setComments(prev => [comment, ...prev]);
-      setNewComment('');
-      
-      if (onCommentCountChange) {
-        onCommentCountChange(comments.length + 1);
-      }
-    } catch (error) {
-      console.error('Failed to post comment:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSubmitReply = async (parentId: string) => {
-    const replyText = replyTexts[parentId] || '';
-    if (!replyText.trim() || isSubmitting) return;
-
-    setIsSubmitting(true);
+    if (!replyText.trim() || isSubmittingReply) return;
+    setIsSubmittingReply(true);
     try {
       const response = await api.post(`/social/posts/${postId}/comments`, {
         content: replyText.trim(),
-        parentId
+        parentId: comment.id,
       });
-
-      const reply = response.data.data;
-      
-      // Add reply to the parent comment
-      setComments(prev => prev.map(comment => {
-        if (comment.id === parentId) {
-          return {
-            ...comment,
-            replies: [...(comment.replies || []), reply]
-          };
-        }
-        return comment;
-      }));
-
-      // Clear the reply text for this specific comment
-      setReplyTexts(prev => ({ ...prev, [parentId]: '' }));
-      setReplyingTo(null);
-      
-      if (onCommentCountChange) {
-        onCommentCountChange(comments.length + 1);
-      }
-    } catch (error) {
-      console.error('Failed to post reply:', error);
+      const newReply = response.data.data;
+      setReplyText('');
+      setShowReplyForm(false);
+      if (onReplyAdded) onReplyAdded(comment.id, newReply);
+    } catch (err) {
+      console.error('Failed to post reply:', err);
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingReply(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m`;
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `${diffInHours}h`;
-    
-    const diffInDays = Math.floor(diffInHours / 24);
-    return `${diffInDays}d`;
-  };
-
-  const CommentItem: React.FC<{ comment: Comment; isReply?: boolean }> = ({ comment, isReply = false }) => {
-    const isHighlighted = highlightCommentId === comment.id;
-    
-    return (
-      <div 
-        className={`comment-item ${isReply ? 'reply' : ''} ${isHighlighted ? 'highlighted' : ''}`}
-        ref={isHighlighted ? highlightedCommentRef : null}
-      >
-      <Link to={`/profile/${comment.authorId}`} className="comment-author-link">
-        {comment.author?.profilePicture ? (
-          <img 
-            src={comment.author.profilePicture} 
-            alt={comment.author.username}
-            className="comment-avatar"
-          />
-        ) : (
-          <div className="comment-avatar-placeholder">
-            {comment.author?.username?.charAt(0).toUpperCase() || 'U'}
-          </div>
-        )}
+  return (
+    <div
+      ref={isHighlighted ? (highlightRef as any) : undefined}
+      style={{
+        display: 'flex', gap: '10px',
+        padding: isReply ? '10px 0 0 0' : '14px 0',
+        borderBottom: isReply ? 'none' : '1px solid var(--border)',
+        backgroundColor: isHighlighted ? 'rgba(139, 36, 56, 0.06)' : 'transparent',
+        borderRadius: isHighlighted ? '8px' : undefined,
+        transition: 'background-color 0.3s',
+      }}
+    >
+      <Link to={`/profile/${comment.authorId}`} style={{ flexShrink: 0, marginTop: '2px' }}>
+        <Avatar username={comment.author?.username} profilePicture={comment.author?.profilePicture} size={isReply ? 30 : 36} />
       </Link>
-      
-      <div className="comment-content">
-        <div className="comment-body">
-          <Link to={`/profile/${comment.authorId}`} className="comment-author">
-            {comment.author?.username || 'Unknown User'}
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Comment bubble */}
+        <div style={{
+          backgroundColor: 'var(--paper-200)',
+          borderRadius: '14px',
+          padding: '10px 14px',
+          display: 'inline-block',
+          maxWidth: '100%',
+        }}>
+          <Link
+            to={`/profile/${comment.authorId}`}
+            style={{
+              fontWeight: 700, fontSize: '13.5px',
+              color: 'var(--ink-900)', textDecoration: 'none',
+              fontFamily: 'var(--font-sans)',
+              display: 'block', marginBottom: '3px',
+            }}
+          >
+            {comment.author?.username || 'Unknown'}
           </Link>
-          <span className="comment-text">{comment.content}</span>
+          <RichText
+            text={comment.content}
+            style={{
+              fontSize: '14px', lineHeight: '1.55',
+              color: 'var(--ink-800)', wordBreak: 'break-word',
+              fontFamily: 'var(--font-sans)',
+            }}
+          />
         </div>
-        
-        <div className="comment-meta">
-          <span className="comment-time">{formatDate(comment.createdAt)}</span>
-          <button className="comment-action-btn like-btn">
-            <span className="action-icon">{comment.isLiked ? '❤️' : '🤍'}</span>
-            {comment.likeCount > 0 && <span className="like-count">{comment.likeCount}</span>}
+
+        {/* Meta row: time + like + reply */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '14px',
+          marginTop: '6px', marginLeft: '4px',
+        }}>
+          <span style={{ fontSize: '12px', color: 'var(--ink-500)', fontFamily: 'var(--font-sans)' }}>
+            {formatDate(comment.createdAt)}
+          </span>
+
+          <button
+            onClick={handleLike}
+            style={{
+              background: 'none', border: 'none', cursor: currentUser ? 'pointer' : 'default',
+              padding: '2px 0', display: 'flex', alignItems: 'center', gap: '4px',
+              fontSize: '12.5px', fontWeight: 700,
+              color: isLiked ? 'var(--wine-700, #8b2438)' : 'var(--ink-500)',
+              fontFamily: 'var(--font-sans)', transition: 'color 0.15s',
+            }}
+          >
+            {isLiked ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+            )}
+            {likeCount > 0 && <span>{likeCount}</span>}
           </button>
-          
-          {!isReply && (
-            <button 
-              className="comment-action-btn reply-btn"
+
+          {!isReply && currentUser && (
+            <button
               onClick={() => {
-                const newReplyingTo = replyingTo === comment.id ? null : comment.id;
-                setReplyingTo(newReplyingTo);
-                // Clear reply text when closing the reply form
-                if (newReplyingTo === null) {
-                  setReplyTexts(prev => ({ ...prev, [comment.id]: '' }));
-                }
+                setShowReplyForm(s => {
+                  const next = !s;
+                  if (next && comment.author?.username) {
+                    setReplyText(`@${comment.author.username} `);
+                  }
+                  return next;
+                });
+              }}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '2px 0', fontSize: '12.5px', fontWeight: 700,
+                color: showReplyForm ? 'var(--wine-700, #8b2438)' : 'var(--ink-500)',
+                fontFamily: 'var(--font-sans)', transition: 'color 0.15s',
               }}
             >
               Reply
@@ -185,148 +225,266 @@ const CommentSection: React.FC<CommentSectionProps> = ({
           )}
         </div>
 
-        {/* Reply Form */}
-        {replyingTo === comment.id && (
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSubmitReply(comment.id);
-            }}
-            className="reply-form"
-          >
-            <div className="reply-input-container" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginTop: '12px', marginLeft: '32px' }}>
-              {currentUser?.profilePicture ? (
-                <img 
-                  src={currentUser.profilePicture} 
-                  alt={currentUser.username}
-                  className="reply-avatar"
-                  style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
-                />
-              ) : (
-                <div className="reply-avatar-placeholder" style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--brand-surface)', color: 'var(--brand-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '14px', flexShrink: 0 }}>
-                  {currentUser?.username?.charAt(0).toUpperCase() || 'U'}
-                </div>
-              )}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <input
-                  type="text"
-                  value={replyTexts[comment.id] || ''}
-                  onChange={(e) => setReplyTexts(prev => ({ ...prev, [comment.id]: e.target.value }))}
-                  placeholder={`Reply to ${comment.author?.username}...`}
-                  className="reply-input"
-                  disabled={isSubmitting}
-                  autoFocus
-                  style={{ width: '100%', padding: '10px 14px', border: '1px solid var(--border)', borderRadius: '20px', backgroundColor: 'var(--paper)', fontSize: '14px', outline: 'none' }}
-                />
-                <div className="reply-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      setReplyingTo(null);
-                      setReplyTexts(prev => ({ ...prev, [comment.id]: '' }));
-                    }}
-                    className="wren-btn wren-btn-secondary"
-                    disabled={isSubmitting}
-                    style={{ padding: '6px 12px', fontSize: '13px', borderRadius: '16px' }}
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit"
-                    disabled={!(replyTexts[comment.id] || '').trim() || isSubmitting}
-                    className="wren-btn wren-btn-primary"
-                    style={{ padding: '6px 16px', fontSize: '13px', borderRadius: '16px', opacity: !(replyTexts[comment.id] || '').trim() || isSubmitting ? 0.6 : 1 }}
-                  >
-                    {isSubmitting ? 'Posting...' : 'Reply'}
-                  </button>
-                </div>
-              </div>
+        {/* Reply input form */}
+        {showReplyForm && currentUser && (
+          <form onSubmit={handleSubmitReply} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '10px' }}>
+            <Avatar username={currentUser.username} profilePicture={currentUser.profilePicture} size={28} />
+            <div style={{ flex: 1, display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <input
+                autoFocus
+                type="text"
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                placeholder={`Reply to ${comment.author?.username || 'this comment'}â€¦`}
+                disabled={isSubmittingReply}
+                style={{
+                  flex: 1, padding: '8px 14px',
+                  border: '1.5px solid var(--border)', borderRadius: '20px',
+                  backgroundColor: 'var(--paper)', fontSize: '13.5px',
+                  outline: 'none', fontFamily: 'var(--font-sans)',
+                  transition: 'border-color 0.2s', color: 'var(--ink-900)',
+                }}
+                onFocus={e => (e.target.style.borderColor = 'var(--wine-700, #8b2438)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+              />
+              <button
+                type="submit"
+                disabled={!replyText.trim() || isSubmittingReply}
+                style={{
+                  padding: '7px 16px', borderRadius: '20px',
+                  backgroundColor: replyText.trim() ? 'var(--wine-700, #8b2438)' : 'var(--paper-300)',
+                  color: replyText.trim() ? '#fff' : 'var(--ink-400)',
+                  border: 'none', cursor: replyText.trim() ? 'pointer' : 'default',
+                  fontSize: '13px', fontWeight: 700, fontFamily: 'var(--font-sans)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {isSubmittingReply ? 'â€¦' : 'Post'}
+              </button>
             </div>
           </form>
         )}
-      </div>
 
-      {/* Nested Replies */}
-      {comment.replies && comment.replies.length > 0 && (
-        <div className="replies-container">
-          {comment.replies.slice(0, expandedReplies[comment.id] ? undefined : 3).map(reply => (
-            <CommentItem key={reply.id} comment={reply} isReply={true} />
-          ))}
-          {!expandedReplies[comment.id] && comment.replies.length > 3 && (
-            <button 
-              className="view-more-replies-btn"
-              onClick={() => setExpandedReplies(prev => ({ ...prev, [comment.id]: true }))}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--ink-500)',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                padding: '4px 0',
-                marginTop: '4px',
-                fontFamily: 'var(--font-sans)',
-                textAlign: 'left'
-              }}
-            >
-              ---- View {comment.replies.length - 3} more replies
-            </button>
-          )}
-        </div>
-      )}
+        {/* Nested Replies */}
+        {replies.length > 0 && (
+          <div style={{
+            marginTop: '8px',
+            paddingLeft: '12px',
+            borderLeft: '2px solid var(--border)',
+          }}>
+            {visibleReplies.map(reply => (
+              <CommentItem
+                key={reply.id}
+                comment={reply}
+                isReply={true}
+                currentUser={currentUser}
+                postId={postId}
+              />
+            ))}
+            {hiddenCount > 0 && !showAllReplies && (
+              <button
+                onClick={() => setShowAllReplies(true)}
+                style={{
+                  background: 'none', border: 'none',
+                  color: 'var(--wine-700, #8b2438)', fontWeight: 700, fontSize: '12.5px',
+                  cursor: 'pointer', padding: '6px 0', fontFamily: 'var(--font-sans)',
+                }}
+              >
+                â†³ View {hiddenCount} more {hiddenCount === 1 ? 'reply' : 'replies'}
+              </button>
+            )}
+            {showAllReplies && replies.length > REPLIES_TO_SHOW && (
+              <button
+                onClick={() => setShowAllReplies(false)}
+                style={{
+                  background: 'none', border: 'none',
+                  color: 'var(--ink-500)', fontWeight: 700, fontSize: '12.5px',
+                  cursor: 'pointer', padding: '6px 0', fontFamily: 'var(--font-sans)',
+                }}
+              >
+                â†‘ Hide replies
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
-    );
+  );
+};
+
+// â”€â”€ CommentSection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const CommentSection: React.FC<CommentSectionProps> = ({
+  postId, currentUser, highlightCommentId, onCommentCountChange,
+}) => {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const highlightedRef = useRef<HTMLDivElement | null>(null);
+
+  const loadComments = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get(`/social/posts/${postId}/comments`);
+      setComments(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to load comments:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [postId]);
+
+  useEffect(() => { loadComments(); }, [loadComments]);
+
+  useEffect(() => {
+    if (highlightCommentId && comments.length > 0 && highlightedRef.current) {
+      setTimeout(() => highlightedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+    }
+  }, [highlightCommentId, comments]);
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await api.post(`/social/posts/${postId}/comments`, { content: newComment.trim() });
+      const comment = res.data.data;
+      // Enrich with current user info in case backend doesn't return author details
+      const enriched: Comment = {
+        ...comment,
+        author: comment.author || {
+          id: currentUser?.id,
+          username: currentUser?.username,
+          profilePicture: currentUser?.profilePicture,
+        } as any,
+      };
+      setComments(prev => [enriched, ...prev]);
+      setNewComment('');
+      if (onCommentCountChange) onCommentCountChange(comments.length + 1);
+    } catch (err) {
+      console.error('Failed to post comment:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReplyAdded = (parentId: string, reply: Comment) => {
+    const enriched: Comment = {
+      ...reply,
+      author: reply.author || {
+        id: currentUser?.id,
+        username: currentUser?.username,
+        profilePicture: currentUser?.profilePicture,
+      } as any,
+    };
+    setComments(prev => prev.map(c =>
+      c.id === parentId
+        ? { ...c, replies: [...(c.replies || []), enriched] }
+        : c
+    ));
   };
 
   return (
-    <div className="comment-section">
-      {/* Comment Form */}
-      {currentUser && (
-        <form onSubmit={handleSubmitComment} className="comment-form">
-          <div className="comment-input-container" style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginTop: '16px', padding: '16px', backgroundColor: 'var(--paper-100)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-            {currentUser.profilePicture ? (
-              <img 
-                src={currentUser.profilePicture} 
-                alt={currentUser.username}
-                className="comment-form-avatar"
-                style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
+    <div style={{ marginTop: '8px' }}>
+      {/* Section header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '10px',
+        marginBottom: '16px', paddingTop: '16px',
+        borderTop: '2px solid var(--border)',
+      }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-600)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <h3 style={{
+          margin: 0, fontSize: '15px', fontWeight: 700,
+          color: 'var(--ink-800)', fontFamily: 'var(--font-sans)',
+        }}>
+          {isLoading ? 'Comments' : comments.length > 0 ? `${comments.length} Comment${comments.length !== 1 ? 's' : ''}` : 'Comments'}
+        </h3>
+      </div>
+
+      {/* Comment input */}
+      {currentUser ? (
+        <form onSubmit={handleSubmitComment} style={{ marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <Avatar username={currentUser.username} profilePicture={currentUser.profilePicture} size={38} />
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '6px 6px 6px 16px',
+              backgroundColor: 'var(--paper-200)',
+              borderRadius: '24px',
+              border: '1.5px solid var(--border)',
+            }}>
+              <input
+                type="text"
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                placeholder="Add a commentâ€¦"
+                disabled={isSubmitting}
+                style={{
+                  flex: 1, background: 'none', border: 'none', outline: 'none',
+                  fontSize: '14.5px', color: 'var(--ink-900)', fontFamily: 'var(--font-sans)',
+                }}
               />
-            ) : (
-              <div className="comment-form-avatar-placeholder" style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--brand-surface)', color: 'var(--brand-ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px', flexShrink: 0 }}>
-                {currentUser.username?.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <input
-              type="text"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
-              className="comment-input"
-              disabled={isSubmitting}
-              style={{ flex: 1, padding: '12px 16px', border: '1px solid var(--border)', borderRadius: '24px', backgroundColor: 'var(--paper)', fontSize: '15px', outline: 'none', transition: 'border-color 0.2s', width: '100%' }}
-            />
-            <button 
-              type="submit"
-              disabled={!newComment.trim() || isSubmitting}
-              className="wren-btn wren-btn-primary"
-              style={{ padding: '10px 20px', borderRadius: '24px', alignSelf: 'center', opacity: !newComment.trim() || isSubmitting ? 0.6 : 1 }}
-            >
-              {isSubmitting ? 'Posting...' : 'Post'}
-            </button>
+              <button
+                type="submit"
+                disabled={!newComment.trim() || isSubmitting}
+                style={{
+                  padding: '7px 18px', borderRadius: '20px',
+                  backgroundColor: newComment.trim() ? 'var(--wine-700, #8b2438)' : 'transparent',
+                  color: newComment.trim() ? '#fff' : 'var(--ink-400)',
+                  border: 'none', cursor: newComment.trim() ? 'pointer' : 'default',
+                  fontSize: '13.5px', fontWeight: 700, fontFamily: 'var(--font-sans)',
+                  transition: 'all 0.2s', whiteSpace: 'nowrap',
+                }}
+              >
+                {isSubmitting ? 'â€¦' : 'Post'}
+              </button>
+            </div>
           </div>
         </form>
+      ) : (
+        <p style={{ color: 'var(--ink-500)', fontSize: '14px', marginBottom: '16px', fontFamily: 'var(--font-sans)' }}>
+          <Link to="/login" style={{ color: 'var(--wine-700, #8b2438)', fontWeight: 700 }}>Log in</Link> to leave a comment.
+        </p>
       )}
 
-      {/* Comments List */}
-      <div className="comments-list">
+      {/* Comments list */}
+      <div>
         {isLoading ? (
-          <div className="comments-loading">Loading comments...</div>
-        ) : comments.length > 0 ? (
-          comments.map(comment => (
-            <CommentItem key={comment.id} comment={comment} />
-          ))
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ display: 'flex', gap: '10px', opacity: 1 - i * 0.25 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', backgroundColor: 'var(--paper-300)', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ height: 14, width: '30%', backgroundColor: 'var(--paper-300)', borderRadius: 6, marginBottom: 8 }} />
+                  <div style={{ height: 14, width: '75%', backgroundColor: 'var(--paper-300)', borderRadius: 6 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : comments.length === 0 ? (
+          <div style={{
+            textAlign: 'center', padding: '32px 16px',
+            color: 'var(--ink-500)', fontSize: '14px',
+            fontFamily: 'var(--font-sans)', fontStyle: 'italic',
+          }}>
+            No comments yet â€” be the first to share your thoughts!
+          </div>
         ) : (
-          <div className="no-comments">No comments yet. Be the first to comment!</div>
+          <div>
+            {comments.map(comment => (
+              <CommentItem
+                key={comment.id}
+                comment={comment}
+                currentUser={currentUser}
+                postId={postId}
+                isHighlighted={highlightCommentId === comment.id}
+                highlightRef={highlightCommentId === comment.id ? highlightedRef : undefined}
+                onReplyAdded={handleReplyAdded}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>

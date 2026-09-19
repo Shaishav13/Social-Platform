@@ -304,9 +304,27 @@ router.get('/posts/:id', async (req: Request, res: Response): Promise<void> => {
     }
 
     res.json({
+      success: true,
+      data: {
+        id: post.id,
+        authorId: post.authorId,
+        author: (post as any).author || null,
+        content: post.content,
+        mediaType: post.mediaType,
+        mediaUrls: post.mediaUrls,
+        media: post.media,
+        likeCount: post.likeCount,
+        commentCount: post.commentCount,
+        shareCount: post.shareCount,
+        isPublic: post.isPublic,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt
+      },
+      // Legacy field for backwards compatibility
       post: {
         id: post.id,
         authorId: post.authorId,
+        author: (post as any).author || null,
         content: post.content,
         mediaType: post.mediaType,
         mediaUrls: post.mediaUrls,
@@ -717,6 +735,7 @@ router.get('/feed', optionalAuth, async (req: Request, res: Response): Promise<v
         shareCount: post.shareCount,
         isPublic: post.isPublic,
         isLiked: post.isLiked, // Include like status
+        isSaved: (post as any).isSaved || false,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt
       })),
@@ -748,6 +767,7 @@ router.get('/trending', async (req: Request, res: Response): Promise<void> => {
       trending: trendingPosts.map(post => ({
         id: post.id,
         authorId: post.authorId,
+        author: (post as any).author || null,
         content: post.content,
         mediaType: post.mediaType,
         mediaUrls: post.mediaUrls,
@@ -814,6 +834,7 @@ router.get('/combined-feed', async (req: Request, res: Response): Promise<void> 
         type: 'post',
         id: post.id,
         authorId: post.authorId,
+        author: (post as any).author || null,
         title: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
         content: post.content,
         excerpt: post.content.substring(0, 200) + (post.content.length > 200 ? '...' : ''),

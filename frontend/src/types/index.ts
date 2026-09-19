@@ -133,6 +133,8 @@ export interface Post {
   shareCount: number;
   isPublic: boolean;
   isLiked?: boolean;
+  isSaved?: boolean;
+  savedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { Post, User } from '../../types';
 import { InteractionBar } from './InteractionBar';
 import { Icon, MediaViewerModal } from '../ui';
+import { RichText } from '../ui/RichText';
 import { resolveMediaUrl } from '../../utils/media';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
@@ -26,8 +27,10 @@ export const PostCard: React.FC<PostCardProps> = ({
   onDelete,
   isDetailView = false,
 }) => {
+  const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [likeCount, setLikeCount] = useState(post.likeCount || 0);
+  const [isSaved, setIsSaved] = useState(Boolean(post.isSaved));
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -39,6 +42,26 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [imgError, setImgError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const [author, setAuthor] = useState<User | null>(post.author || null);
+
+  useEffect(() => {
+    if (post.author?.username) {
+      setAuthor(post.author);
+    } else if (post.authorId) {
+      api.get(`/profile/${post.authorId}`).then(res => {
+        if (res.data) {
+          setAuthor(res.data);
+        }
+      }).catch(() => {});
+    }
+  }, [post.author, post.authorId]);
+
+  useEffect(() => {
+    if (post.isSaved !== undefined) {
+      setIsSaved(Boolean(post.isSaved));
+    }
+  }, [post.isSaved]);
+
   const { user: authUser } = useAuth();
   const effectiveUser = currentUser || authUser;
 
@@ -46,7 +69,8 @@ export const PostCard: React.FC<PostCardProps> = ({
   const isOwner = Boolean(
     effectiveUser && (
       effectiveUser.id === post.authorId ||
-      effectiveUser.id === post.author?.id
+      effectiveUser.id === post.author?.id ||
+      effectiveUser.id === author?.id
     )
   );
   const isAdmin = effectiveUser?.role === 'admin';
@@ -136,6 +160,24 @@ export const PostCard: React.FC<PostCardProps> = ({
     }
   };
 
+  const handleSaveToggle = async () => {
+    if (!effectiveUser) {
+      navigate('/login');
+      return;
+    }
+    const prev = isSaved;
+    setIsSaved(!prev);
+    try {
+      const res = await api.post(`/social/posts/${post.id}/save`);
+      if (res.data?.data?.saved !== undefined) {
+        setIsSaved(res.data.data.saved);
+      }
+    } catch (err) {
+      console.error('Failed to toggle save post:', err);
+      setIsSaved(prev);
+    }
+  };
+
   // Resolve media URLs
   const mediaUrls = post.mediaUrls || [];
 
@@ -144,11 +186,11 @@ export const PostCard: React.FC<PostCardProps> = ({
       {/* Post Header: Author and metadata */}
       <div className="wren-post-header">
         <div className="wren-author-info">
-          <Link to={`/profile/${post.authorId || post.author?.id}`}>
-            {post.author?.profilePicture && !imgError ? (
+          <Link to={`/profile/${post.authorId || author?.id || author?.username}`}>
+            {author?.profilePicture && !imgError ? (
               <img
-                src={resolveMediaUrl(post.author.profilePicture)}
-                alt={post.author.username}
+                src={resolveMediaUrl(author.profilePicture)}
+                alt={author.username}
                 className="wren-avatar"
                 style={{ width: '32px', height: '32px' }}
                 onError={() => setImgError(true)}
@@ -158,21 +200,21 @@ export const PostCard: React.FC<PostCardProps> = ({
                 className="wren-avatar-placeholder"
                 style={{ width: '32px', height: '32px', fontSize: '13px' }}
               >
-                {post.author?.username?.charAt(0).toUpperCase() || 'W'}
+                {author?.username?.charAt(0).toUpperCase() || 'W'}
               </div>
             )}
           </Link>
 
           <div>
             <Link
-              to={`/profile/${post.authorId || post.author?.id}`}
+              to={`/profile/${post.authorId || author?.id || author?.username}`}
               className="wren-author-name"
               id={`post-author-${post.id}`}
             >
-              {post.author?.username || 'Anonymous'}
+              {author?.username || (post as any).authorUsername || (post as any).author_username || 'Anonymous'}
             </Link>
             <span className="wren-author-handle" style={{ marginLeft: '6px' }}>
-              @{post.author?.username || 'anonymous'}
+              @{author?.username || (post as any).authorUsername || (post as any).author_username || 'anonymous'}
             </span>
           </div>
         </div>
@@ -322,10 +364,10 @@ export const PostCard: React.FC<PostCardProps> = ({
       ) : (
         <div className="wren-post-body">
           {isDetailView ? (
-            <p>{post.content}</p>
+            <p><RichText text={post.content} /></p>
           ) : (
             <Link to={`/post/${post.id}`} style={{ display: 'block', color: 'inherit' }}>
-              <p>{post.content}</p>
+              <p><RichText text={post.content} /></p>
             </Link>
           )}
         </div>
@@ -456,7 +498,9 @@ export const PostCard: React.FC<PostCardProps> = ({
         likeCount={likeCount}
         commentCount={post.commentCount || 0}
         isLiked={isLiked}
+        isSaved={isSaved}
         onLikeToggle={handleLikeToggle}
+        onSaveClick={handleSaveToggle}
         onCommentClick={() => {
           if (!isDetailView) {
             window.location.href = `/post/${post.id}`;

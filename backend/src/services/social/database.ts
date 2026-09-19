@@ -71,6 +71,17 @@ export class SocialDatabase {
         )
       `);
 
+      // Create saved_posts table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS saved_posts (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, post_id)
+        )
+      `);
+
       // Create indexes for better performance
       await client.query('CREATE INDEX IF NOT EXISTS idx_likes_target ON likes(target_id, target_type)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_likes_user ON likes(user_id)');
@@ -83,6 +94,8 @@ export class SocialDatabase {
       await client.query('CREATE INDEX IF NOT EXISTS idx_follow_requests_requester ON follow_requests(requester_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_follow_requests_target ON follow_requests(target_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_follow_requests_status ON follow_requests(status)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_saved_posts_user_id ON saved_posts(user_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_saved_posts_created_at ON saved_posts(created_at DESC)');
 
     } finally {
       client.release();
@@ -796,5 +809,86 @@ export class SocialDatabase {
       'DELETE FROM follow_requests WHERE requester_id = $1 OR target_id = $1',
       [userId]
     );
+  }
+
+  // Saved Posts Methods
+  static async toggleSavePost(userId: string, postId: string): Promise<{ saved: boolean }> {
+    const client = await DatabaseConnection.getClient();
+    try {
+      const existing = await client.query(
+        'SELECT id FROM saved_posts WHERE user_id = $1 AND post_id = $2',
+        [userId, postId]
+      );
+      if (existing.rows.length > 0) {
+        await client.query(
+          'DELETE FROM saved_posts WHERE user_id = $1 AND post_id = $2',
+          [userId, postId]
+        );
+        return { saved: false };
+      } else {
+        await client.query(
+          'INSERT INTO saved_posts (user_id, post_id) VALUES ($1, $2)',
+          [userId, postId]
+        );
+        return { saved: true };
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  static async isPostSaved(userId: string, postId: string): Promise<boolean> {
+    const result = await DatabaseConnection.query(
+      'SELECT 1 FROM saved_posts WHERE user_id = $1 AND post_id = $2',
+      [userId, postId]
+    );
+    return Boolean((result as any).rows && (result as any).rows.length > 0);
+  }
+
+  static async getSavedPosts(userId: string, limit: number = 20, offset: number = 0): Promise<any[]> {
+    const client = await DatabaseConnection.getClient();
+    try {
+      const result = await client.query(
+        `SELECT p.*,
+                u.username as author_username,
+                u.profile_picture as author_profile_picture,
+                sp.created_at as saved_at,
+                true as is_saved,
+                CASE WHEN l.id IS NOT NULL THEN true ELSE false END as is_liked
+         FROM saved_posts sp
+         JOIN posts p ON sp.post_id = p.id
+         LEFT JOIN users u ON p.author_id = u.id
+         LEFT JOIN likes l ON p.id = l.target_id AND l.target_type = 'post' AND l.user_id = $1
+         WHERE sp.user_id = $1
+         ORDER BY sp.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        [userId, limit, offset]
+      );
+
+      return result.rows.map(row => ({
+        id: row.id,
+        authorId: row.author_id,
+        author: {
+          id: row.author_id,
+          username: row.author_username,
+          profilePicture: row.author_profile_picture
+        },
+        content: row.content,
+        mediaType: row.media_type,
+        mediaUrls: row.media_urls || [],
+        media: [],
+        likeCount: row.like_count,
+        commentCount: row.comment_count,
+        shareCount: row.share_count,
+        isPublic: row.is_public,
+        isLiked: row.is_liked,
+        isSaved: true,
+        savedAt: row.saved_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+      }));
+    } finally {
+      client.release();
+    }
   }
 }

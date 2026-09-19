@@ -104,7 +104,7 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // If viewing own profile, return private profile
+    // If viewing own profile by ID, return private profile
     if (profileId === viewerId) {
       const privateProfile = await ProfileModel.getPrivateProfile(profileId, viewerId);
       if (!privateProfile) {
@@ -120,6 +120,15 @@ router.get('/:id', optionalAuth, async (req: Request, res: Response): Promise<vo
     if (!publicProfile) {
       res.status(404).json({ error: 'Profile not found' });
       return;
+    }
+
+    // If resolved user is the viewer, return full private profile
+    if (publicProfile.id === viewerId) {
+      const privateProfile = await ProfileModel.getPrivateProfile(publicProfile.id, viewerId);
+      if (privateProfile) {
+        res.json(privateProfile);
+        return;
+      }
     }
 
     res.json(publicProfile);

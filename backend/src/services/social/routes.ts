@@ -1,10 +1,54 @@
 import express from 'express';
 import { LikeModel, CommentModel, ShareModel, FollowModel } from './models';
+import { SocialDatabase } from './database';
 import { authenticateToken } from '../auth/middleware';
 import { NotificationEventHandlers } from '../notification/eventHandlers';
 import { ContentDatabase } from '../content/database';
 
 const router = express.Router();
+
+// Save / Bookmark endpoints
+router.post('/posts/:id/save', authenticateToken, async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = (req as any).user.userId;
+
+    const result = await SocialDatabase.toggleSavePost(userId, postId);
+
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error toggling post save:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.get('/saved-posts', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.userId;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const posts = await SocialDatabase.getSavedPosts(userId, limit, offset);
+
+    res.status(200).json({
+      success: true,
+      data: posts,
+      posts
+    });
+  } catch (error) {
+    console.error('Error fetching saved posts:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
 
 // Like/Unlike endpoints
 router.post('/posts/:id/like', authenticateToken, async (req, res) => {

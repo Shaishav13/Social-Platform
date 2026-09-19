@@ -34,11 +34,16 @@ export class ProfileModel {
     };
   }
 
-  static async getPublicProfile(userId: string, viewerId?: string): Promise<PublicProfile | null> {
-    const user = await AuthDatabase.findUserById(userId);
+  static async getPublicProfile(userIdOrUsername: string, viewerId?: string): Promise<PublicProfile | null> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdOrUsername);
+    const user = isUuid
+      ? await AuthDatabase.findUserById(userIdOrUsername)
+      : await AuthDatabase.findUserByUsername(userIdOrUsername);
     if (!user) {
       return null;
     }
+
+    const userId = user.id;
 
     // Get counts
     const followerCount = await SocialDatabase.getFollowerCount(userId);
@@ -70,14 +75,19 @@ export class ProfileModel {
     return profile;
   }
 
-  static async getPrivateProfile(userId: string, viewerId: string): Promise<PrivateProfile | null> {
-    // Only allow users to view their own private profile
-    if (userId !== viewerId) {
+  static async getPrivateProfile(userIdOrUsername: string, viewerId: string): Promise<PrivateProfile | null> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdOrUsername);
+    const user = isUuid
+      ? await AuthDatabase.findUserById(userIdOrUsername)
+      : await AuthDatabase.findUserByUsername(userIdOrUsername);
+    if (!user) {
       return null;
     }
 
-    const user = await AuthDatabase.findUserById(userId);
-    if (!user) {
+    const userId = user.id;
+
+    // Only allow users to view their own private profile
+    if (userId !== viewerId) {
       return null;
     }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { User, Post } from '../types';
 import SearchBar from '../components/Search/SearchBar';
@@ -18,7 +18,9 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 const Explore: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const initialTag = searchParams.get('tag');
+  const [searchQuery, setSearchQuery] = useState(initialTag ? `#${initialTag}` : '');
   const debouncedQuery = useDebounce(searchQuery.trim(), 350);
   const [searchResults, setSearchResults] = useState<{
     users: User[];

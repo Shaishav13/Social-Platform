@@ -1,14 +1,69 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Icon } from '../components/ui';
 import api from '../services/api';
+import { PostCard, SkeletonLoader } from '../components/wren';
+import type { Post } from '../types';
 
 const Settings: React.FC = () => {
   const { user, updateUser, logout } = useAuth();
   const { theme, density, toggleTheme, toggleDensity } = useTheme();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialView = searchParams.get('view') === 'saved' ? 'saved' : (searchParams.get('view') === 'accountInfo' ? 'accountInfo' : 'main');
+  const [activeView, setActiveView] = useState<'main' | 'accountInfo' | 'saved'>(initialView);
+
+  // Saved Posts State
+  const [savedPosts, setSavedPosts] = useState<Post[]>([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [savedError, setSavedError] = useState('');
+
+  useEffect(() => {
+    const viewParam = searchParams.get('view');
+    if (viewParam === 'saved' && activeView !== 'saved') {
+      setActiveView('saved');
+    } else if (viewParam === 'accountInfo' && activeView !== 'accountInfo') {
+      setActiveView('accountInfo');
+    } else if (!viewParam && activeView !== 'main') {
+      setActiveView('main');
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (activeView === 'saved') {
+      loadSavedPosts();
+    }
+  }, [activeView]);
+
+  const loadSavedPosts = async () => {
+    try {
+      setIsLoadingSaved(true);
+      setSavedError('');
+      const res = await api.get('/social/saved-posts');
+      const posts = res.data.posts || res.data.data || [];
+      setSavedPosts(posts);
+    } catch (err: any) {
+      console.error('Failed to load saved posts:', err);
+      setSavedError('Failed to load saved posts. Please try again.');
+    } finally {
+      setIsLoadingSaved(false);
+    }
+  };
+
+  const handleSavedPostUpdate = (updatedPost: Post) => {
+    if (updatedPost.isSaved === false) {
+      setSavedPosts(prev => prev.filter(p => p.id !== updatedPost.id));
+    } else {
+      setSavedPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
+    }
+  };
+
+  const handleSavedPostDelete = (postId: string) => {
+    setSavedPosts(prev => prev.filter(p => p.id !== postId));
+  };
 
   const [isPrivate, setIsPrivate] = useState<boolean>(Boolean(user?.isPrivate));
   const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
@@ -56,6 +111,13 @@ const Settings: React.FC = () => {
   const [dobChangeError, setDobChangeError] = useState('');
   const [dobChangeSuccess, setDobChangeSuccess] = useState('');
   const [isSubmittingDob, setIsSubmittingDob] = useState(false);
+
+  // Username Change State
+  const [isChangingUsername, setIsChangingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState(user?.username || '');
+  const [usernameChangeError, setUsernameChangeError] = useState('');
+  const [usernameChangeSuccess, setUsernameChangeSuccess] = useState('');
+  const [isSubmittingUsername, setIsSubmittingUsername] = useState(false);
 
   const handleTogglePrivacy = async (newVal: boolean) => {
     setIsUpdatingPrivacy(true);
@@ -211,6 +273,31 @@ const Settings: React.FC = () => {
     }
   };
 
+  const handleUpdateUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUsername || newUsername.length < 3) {
+      setUsernameChangeError('Username must be at least 3 characters.');
+      return;
+    }
+    setIsSubmittingUsername(true);
+    setUsernameChangeError('');
+    setUsernameChangeSuccess('');
+
+    try {
+      // The backend expects PUT /auth/profile for username changes
+      const response = await api.put('/auth/profile', { username: newUsername });
+      if (response.data.success) {
+        updateUser(response.data.data);
+        setIsChangingUsername(false);
+        setUsernameChangeSuccess('Username updated successfully.');
+      }
+    } catch (err: any) {
+      setUsernameChangeError(err.response?.data?.message || 'Failed to update username.');
+    } finally {
+      setIsSubmittingUsername(false);
+    }
+  };
+
   // Determine if DOB is locked
   const isDobLocked = (): boolean => {
     if (!user?.dobLastChangedAt) return false;
@@ -223,6 +310,18 @@ const Settings: React.FC = () => {
     const unlockDate = new Date(user.dobLastChangedAt);
     unlockDate.setDate(unlockDate.getDate() + 120);
     return unlockDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  };
+
+  const calculateAge = (dob: string | null | undefined): string => {
+    if (!dob) return 'Not set';
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age.toString();
   };
 
   if (!user) {
@@ -246,40 +345,153 @@ const Settings: React.FC = () => {
     <div className="wren-settings-page" style={{ maxWidth: '680px', margin: '24px auto 80px', padding: '0 20px' }}>
       {/* Navigation Breadcrumb */}
       <div style={{ marginBottom: '20px' }}>
-        <Link
-          to={`/profile/${user.id}`}
-          className="wren-button wren-button--ghost"
-          style={{
-            padding: '6px 14px',
-            fontSize: '13px',
-            gap: '8px',
-            display: 'inline-flex',
-            alignItems: 'center'
-          }}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg>
-          Back to Profile
-        </Link>
+        {activeView === 'main' ? (
+          <Link
+            to={`/profile/${user.id}`}
+            className="wren-button wren-button--ghost"
+            style={{
+              padding: '6px 14px',
+              fontSize: '13px',
+              gap: '8px',
+              display: 'inline-flex',
+              alignItems: 'center'
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+            Back to Profile
+          </Link>
+        ) : (
+          <button
+            type="button"
+            className="wren-button wren-button--ghost"
+            style={{
+              padding: '6px 14px',
+              fontSize: '13px',
+              gap: '8px',
+              display: 'inline-flex',
+              alignItems: 'center'
+            }}
+            onClick={() => {
+              setActiveView('main');
+              setSearchParams({});
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+            Back to Settings
+          </button>
+        )}
       </div>
 
       {/* Page Title & Subtitle */}
       <div style={{ marginBottom: '28px' }}>
         <h1 className="type-display-l" style={{ margin: '0 0 6px' }}>
-          Account Settings
+          {activeView === 'accountInfo' ? 'Account Information' : activeView === 'saved' ? 'Saved' : 'Account Settings'}
         </h1>
         <p className="type-ui-m" style={{ color: 'var(--ink-600)', margin: 0 }}>
-          Manage your correspondence privacy, reading appearance, and account preferences.
+          {activeView === 'accountInfo' 
+            ? 'See information about your account like your name, email, and date of birth.'
+            : activeView === 'saved'
+            ? 'All the letters and posts you have saved for later reading.'
+            : 'Manage your correspondence privacy, reading appearance, and account preferences.'}
         </p>
       </div>
 
-      {/* SECTION 0: ACCOUNT INFORMATION */}
-      <div className="wren-card" style={{ marginBottom: '28px' }}>
-        <h2 className="type-display-m" style={{ margin: '0 0 16px', fontSize: '1.25rem' }}>
-          Account Information
-        </h2>
+      {activeView === 'main' && (
+        <>
+          <div className="wren-card" style={{ marginBottom: '16px', padding: '0' }}>
+            <button 
+              className="wren-button wren-button--ghost" 
+              style={{ width: '100%', justifyContent: 'space-between', padding: '16px 24px', textAlign: 'left', borderRadius: 'var(--radius-md)' }}
+              onClick={() => {
+                setActiveView('accountInfo');
+                setSearchParams({ view: 'accountInfo' });
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <Icon name="profile" size={24} color="var(--ink-500)" />
+                <div>
+                  <h2 style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 600, color: 'var(--ink-900)' }}>Account Information</h2>
+                  <p className="type-ui-m" style={{ color: 'var(--ink-600)', margin: 0 }}>See your account details like your name, email, and date of birth.</p>
+                </div>
+              </div>
+              <Icon name="chevron-right" size={24} color="var(--ink-400)" />
+            </button>
+          </div>
+
+          <div className="wren-card" style={{ marginBottom: '28px', padding: '0' }}>
+            <button 
+              className="wren-button wren-button--ghost" 
+              style={{ width: '100%', justifyContent: 'space-between', padding: '16px 24px', textAlign: 'left', borderRadius: 'var(--radius-md)' }}
+              onClick={() => {
+                setActiveView('saved');
+                setSearchParams({ view: 'saved' });
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <Icon name="save" size={24} color="var(--ink-500)" />
+                <div>
+                  <h2 style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 600, color: 'var(--ink-900)' }}>Saved</h2>
+                  <p className="type-ui-m" style={{ color: 'var(--ink-600)', margin: 0 }}>View all your saved correspondence and posts.</p>
+                </div>
+              </div>
+              <Icon name="chevron-right" size={24} color="var(--ink-400)" />
+            </button>
+          </div>
+        </>
+      )}
+
+      {activeView === 'accountInfo' && (
+        <div className="wren-card" style={{ marginBottom: '28px' }}>
+          {/* Username Setting */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--ink-900)' }}>Name</span>
+            {!isChangingUsername && (
+              <button 
+                type="button" 
+                className="wren-button wren-button--ghost" 
+                style={{ fontSize: '13px', padding: '4px 8px' }}
+                onClick={() => setIsChangingUsername(true)}
+              >
+                Change
+              </button>
+            )}
+          </div>
+          
+          {!isChangingUsername ? (
+            <div style={{ fontSize: '15px', color: 'var(--ink-600)' }}>{user.username}</div>
+          ) : (
+            <form onSubmit={handleUpdateUsername} style={{ backgroundColor: 'var(--paper-200)', padding: '16px', borderRadius: 'var(--radius-sm)' }}>
+              <label className="wren-label" style={{ marginBottom: '8px' }}>New Name (Username)</label>
+              <input
+                type="text"
+                className="wren-input"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder="Enter new username"
+                required
+                minLength={3}
+                style={{ marginBottom: '12px' }}
+              />
+              {usernameChangeError && <div className="wren-error" style={{ marginBottom: '12px' }}>{usernameChangeError}</div>}
+              {usernameChangeSuccess && <div className="wren-success" style={{ marginBottom: '12px', fontSize: '13.5px' }}>{usernameChangeSuccess}</div>}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" className="wren-button wren-button--ghost" onClick={() => setIsChangingUsername(false)}>Cancel</button>
+                <button type="submit" className="wren-button wren-button--wine" disabled={isSubmittingUsername}>
+                  {isSubmittingUsername ? 'Saving...' : 'Save Name'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 24px' }} />
 
         {/* Email Setting */}
         <div style={{ marginBottom: '24px' }}>
@@ -350,6 +562,16 @@ const Settings: React.FC = () => {
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 24px' }} />
 
+        {/* Age Display (Read-only) */}
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--ink-900)' }}>Age</span>
+          </div>
+          <div style={{ fontSize: '15px', color: 'var(--ink-600)' }}>{calculateAge(user.dateOfBirth)}</div>
+        </div>
+
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '0 0 24px' }} />
+
         {/* Date of Birth Setting */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -403,10 +625,78 @@ const Settings: React.FC = () => {
           )}
         </div>
       </div>
+      )}
 
-      {/* SECTION 1: ACCOUNT PRIVACY & VISIBILITY */}
-      <div className="wren-card" style={{ marginBottom: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
+      {activeView === 'saved' && (
+        <div>
+          {isLoadingSaved ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <SkeletonLoader count={3} />
+            </div>
+          ) : savedError ? (
+            <div className="wren-card" style={{ textAlign: 'center', padding: '32px' }}>
+              <p style={{ color: 'var(--rust-alert)', marginBottom: '16px' }}>{savedError}</p>
+              <button onClick={loadSavedPosts} className="wren-button wren-button--wine">
+                Retry
+              </button>
+            </div>
+          ) : savedPosts.length === 0 ? (
+            <div
+              className="wren-card"
+              style={{
+                textAlign: 'center',
+                padding: '48px 24px',
+                borderStyle: 'dashed',
+              }}
+            >
+              <div
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--paper-200)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px',
+                  color: 'var(--ink-500)',
+                }}
+              >
+                <Icon name="save" size={28} />
+              </div>
+              <h3 className="type-display-m" style={{ marginBottom: '8px', fontSize: '18px' }}>
+                No saved posts yet
+              </h3>
+              <p className="type-ui-m" style={{ color: 'var(--ink-600)', maxWidth: '380px', margin: '0 auto 20px' }}>
+                When you find posts or letters you want to revisit, tap the bookmark icon to save them here.
+              </p>
+              <Link to="/feed" className="wren-btn wren-btn-primary" style={{ display: 'inline-flex', padding: '8px 20px' }}>
+                Browse Feed
+              </Link>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {savedPosts.map(post => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  currentUser={user}
+                  onPostUpdate={handleSavedPostUpdate}
+                  onUpdate={handleSavedPostUpdate}
+                  onPostDelete={handleSavedPostDelete}
+                  onDelete={handleSavedPostDelete}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeView === 'main' && (
+        <>
+          {/* SECTION 1: ACCOUNT PRIVACY & VISIBILITY */}
+          <div className="wren-card" style={{ marginBottom: '28px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <span style={{ display: 'flex', alignItems: 'center', color: 'var(--ink-700)' }}><Icon name={isPrivate ? 'lock' : 'users'} size={24} /></span>
@@ -822,6 +1112,8 @@ const Settings: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

@@ -215,8 +215,11 @@ export class ContentDatabase {
       const params: any[] = [];
       let paramCount = 1;
       let query = `
-        SELECT p.*
+        SELECT p.*,
+               u.username as author_username,
+               u.profile_picture as author_profile_picture
         FROM posts p
+        LEFT JOIN users u ON p.author_id = u.id
         WHERE p.is_public = true
       `;
 
@@ -239,6 +242,11 @@ export class ContentDatabase {
         const post = this.mapRowToPost(row);
         return {
           ...post,
+          author: {
+            id: post.authorId,
+            username: row.author_username,
+            profilePicture: row.author_profile_picture
+          },
           media: []
         };
       });
@@ -250,12 +258,29 @@ export class ContentDatabase {
 
   static async findPostById(postId: string): Promise<Post | null> {
     const result = await DatabaseConnection.query(
-      `SELECT * FROM posts WHERE id = $1`,
+      `SELECT p.*,
+              u.username as author_username,
+              u.profile_picture as author_profile_picture
+       FROM posts p
+       LEFT JOIN users u ON p.author_id = u.id
+       WHERE p.id = $1`,
       [postId]
     );
 
     const rows = (result as any).rows;
-    return rows && rows.length > 0 ? this.mapRowToPost(rows[0]) : null;
+    if (rows && rows.length > 0) {
+      const row = rows[0];
+      const post = this.mapRowToPost(row);
+      return {
+        ...post,
+        author: {
+          id: post.authorId,
+          username: row.author_username,
+          profilePicture: row.author_profile_picture
+        }
+      } as any; // Cast as any because Post type might not strictly have author property in all contexts, but we return it
+    }
+    return null;
   }
 
   static async findPostWithMedia(postId: string): Promise<PostWithMedia | null> {
@@ -264,7 +289,12 @@ export class ContentDatabase {
     try {
       // Get the post
       const postResult = await client.query(
-        `SELECT * FROM posts WHERE id = $1`,
+        `SELECT p.*,
+                u.username as author_username,
+                u.profile_picture as author_profile_picture
+         FROM posts p
+         LEFT JOIN users u ON p.author_id = u.id
+         WHERE p.id = $1`,
         [postId]
       );
 
@@ -272,14 +302,20 @@ export class ContentDatabase {
         return null;
       }
 
-      const post = this.mapRowToPost(postResult.rows[0]);
+      const row = postResult.rows[0];
+      const post = this.mapRowToPost(row);
 
       // For now, we'll use the media_urls from the post directly
       // In the future, we could join with media_files table for more details
       const postWithMedia: PostWithMedia = {
         ...post,
+        author: {
+          id: post.authorId,
+          username: row.author_username,
+          profilePicture: row.author_profile_picture
+        },
         media: [] // This could be populated with full media file objects if needed
-      };
+      } as any;
 
       return postWithMedia;
 
@@ -412,7 +448,7 @@ export class ContentDatabase {
       
       query += `
         FROM posts p
-        JOIN users u ON p.author_id = u.id
+        LEFT JOIN users u ON p.author_id = u.id
       `;
       
       // Add left join for likes if viewer is provided
@@ -484,11 +520,13 @@ export class ContentDatabase {
     
     try {
       const result = await client.query(`
-        SELECT p.*
+        SELECT p.*,
+               u.username as author_username,
+               u.profile_picture as author_profile_picture
         FROM posts p
-        JOIN users u ON p.author_id = u.id
+        LEFT JOIN users u ON p.author_id = u.id
         WHERE p.is_public = true
-          AND u.is_private = false
+          AND (u.is_private = false OR u.is_private IS NULL)
           AND COALESCE(u.is_18_plus, false) = false
           AND p.created_at > NOW() - INTERVAL '7 days'
         ORDER BY (p.like_count + p.comment_count + p.share_count) DESC, p.created_at DESC
@@ -499,6 +537,11 @@ export class ContentDatabase {
         const post = this.mapRowToPost(row);
         return {
           ...post,
+          author: {
+            id: post.authorId,
+            username: row.author_username,
+            profilePicture: row.author_profile_picture
+          },
           media: []
         };
       });
@@ -590,26 +633,29 @@ export class ContentDatabase {
                u.profile_picture as author_profile_picture
       `;
       
-      // Add like status if user is provided
+      // Add like and save status if user is provided
       if (options.userId) {
         query += `,
-               CASE WHEN l.id IS NOT NULL THEN true ELSE false END as is_liked
+               CASE WHEN l.id IS NOT NULL THEN true ELSE false END as is_liked,
+               CASE WHEN sp.id IS NOT NULL THEN true ELSE false END as is_saved
         `;
       }
       
       query += `
         FROM posts p
-        JOIN users u ON p.author_id = u.id
+        LEFT JOIN users u ON p.author_id = u.id
       `;
       
-      // Add left join for likes if user is provided
+      // Add left join for likes and saved_posts if user is provided
       if (options.userId) {
         query += `
         LEFT JOIN likes l ON p.id = l.target_id 
                          AND l.target_type = 'post' 
                          AND l.user_id = $${paramCount++}
+        LEFT JOIN saved_posts sp ON p.id = sp.post_id
+                                AND sp.user_id = $${paramCount++}
         `;
-        params.push(options.userId);
+        params.push(options.userId, options.userId);
       }
       
       query += `
@@ -664,6 +710,7 @@ export class ContentDatabase {
         return {
           ...post,
           isLiked: options.userId ? row.is_liked : undefined,
+          isSaved: options.userId ? row.is_saved : undefined,
           author: {
             id: post.authorId,
             username: row.author_username,
