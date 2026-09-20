@@ -6,7 +6,9 @@ const ResetPassword: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const [token] = useState(searchParams.get('token') || '');
+  const queryToken = (searchParams.get('token') || '').trim();
+  const [token, setToken] = useState(queryToken);
+  const [manualTokenInput, setManualTokenInput] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNew, setShowNew] = useState(false);
@@ -16,10 +18,10 @@ const ResetPassword: React.FC = () => {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setError('No reset token found. Please request a new recovery link.');
+    if (queryToken) {
+      setToken(queryToken);
     }
-  }, [token]);
+  }, [queryToken]);
 
   // Password strength indicator
   const getStrength = (pwd: string): { score: number; label: string; color: string } => {
@@ -131,19 +133,87 @@ const ResetPassword: React.FC = () => {
           </div>
         ) : !token ? (
           <div>
-            <p className="type-meta" style={{ marginBottom: '16px' }}>
-              This recovery link is invalid or has expired.
+            <p className="type-body-serif" style={{ fontSize: '0.95rem', marginBottom: '16px' }}>
+              No recovery token was detected in your link. If you received a recovery token in your email, please paste it below:
             </p>
-            <Link
-              to="/forgot-password"
-              className="wren-button wren-button--wine"
-              style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (manualTokenInput.trim()) {
+                  setToken(manualTokenInput.trim());
+                  setError('');
+                }
+              }}
+              style={{ marginBottom: '20px' }}
             >
-              Request a New Recovery Link
-            </Link>
+              <div className="wren-form-group">
+                <label htmlFor="tokenInput" className="wren-label">
+                  Recovery Token
+                </label>
+                <input
+                  type="text"
+                  id="tokenInput"
+                  value={manualTokenInput}
+                  onChange={(e) => setManualTokenInput(e.target.value)}
+                  placeholder="Paste your 64-character token here..."
+                  className="wren-input"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={!manualTokenInput.trim()}
+                className="wren-button wren-button--wine"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Continue with Token
+              </button>
+            </form>
+            <div style={{ textAlign: 'center', marginTop: '12px' }}>
+              <Link
+                to="/forgot-password"
+                style={{ color: 'var(--wine-700)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500 }}
+              >
+                Or request a new recovery link
+              </Link>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 12px',
+                backgroundColor: 'var(--paper-200)',
+                borderRadius: 'var(--radius-sm)',
+                marginBottom: '16px',
+                fontSize: '0.85rem',
+              }}
+            >
+              <span style={{ color: 'var(--ink-600)' }}>
+                ✓ Recovery token verified
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setToken('');
+                  setManualTokenInput('');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--wine-700)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  textDecoration: 'underline',
+                  padding: 0,
+                }}
+              >
+                Change token
+              </button>
+            </div>
             <div className="wren-form-group">
               <label htmlFor="newPassword" className="wren-label">
                 New Password

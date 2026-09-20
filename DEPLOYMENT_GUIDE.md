@@ -154,10 +154,14 @@ git push -u origin main
 ### Step 6: Connect CORS & Complete Security Lock (1 Minute)
 
 1. Return to **Render.com** → Your `udtabirdie-api` service → **Environment**.
-2. Update `ALLOWED_ORIGINS` to your Vercel URL:
+2. Update `ALLOWED_ORIGINS` and `FRONTEND_URL` to your Vercel URL:
    ```env
    ALLOWED_ORIGINS=https://udtabirdie.vercel.app
+   FRONTEND_URL=https://udtabirdie.vercel.app
    ```
+   > [!NOTE]
+   > UdtaBirdie dynamically resolves your frontend domain directly from the incoming browser request (Origin/Referer headers and payload), guaranteeing password recovery emails link to your live Vercel domain (`*.vercel.app` or custom domain) rather than localhost. Setting `FRONTEND_URL` explicitly on Render reinforces this as an authoritative baseline.
+
 3. Click **Save Changes**. Render will automatically redeploy with the strict CORS lock.
 4. Only requests originating from your secure HTTPS Vercel domain will be permitted.
 

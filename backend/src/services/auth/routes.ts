@@ -1092,8 +1092,101 @@ router.put('/password', authenticateToken, async (req: Request, res: Response) =
   }
 });
 
+/**
+ * Helper to dynamically determine the trusted frontend base URL for password reset links.
+ * Works seamlessly in both local development and multi-cloud deployments (Vercel, Render, custom domains).
+ */
+function resolveFrontendBaseUrl(req: Request): string {
+  const sanitize = (val?: string | null): string | null => {
+    if (!val || typeof val !== 'string') return null;
+    try {
+      const parsed = new URL(val.trim());
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed.origin;
+      }
+    } catch (_) {}
+    return null;
+  };
+
+  const isLocalhost = (originStr: string): boolean => {
+    try {
+      const u = new URL(originStr);
+      return u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '0.0.0.0';
+    } catch {
+      return false;
+    }
+  };
+
+  const isTrustedDomain = (originStr: string): boolean => {
+    try {
+      const u = new URL(originStr);
+      const host = u.hostname.toLowerCase();
+      // Allow localhost in development or local testing
+      if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') return true;
+      // Allow standard frontend hosting providers
+      if (
+        host.endsWith('.vercel.app') ||
+        host.endsWith('.pages.dev') ||
+        host.endsWith('.netlify.app') ||
+        host.endsWith('.onrender.com')
+      ) {
+        return true;
+      }
+      // Check against configured allowed origins
+      const configured = [
+        process.env.FRONTEND_URL,
+        process.env.CLIENT_URL,
+        process.env.APP_URL,
+        ...(process.env.ALLOWED_ORIGINS || '').split(','),
+      ]
+        .map(s => (s ? sanitize(s) : null))
+        .filter(Boolean) as string[];
+
+      if (configured.some(cfg => cfg === originStr)) return true;
+      if ((process.env.ALLOWED_ORIGINS || '').includes('*')) return true;
+
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  // Order of preference for candidate origins
+  const candidates: (string | null)[] = [
+    sanitize(req.body?.frontendUrl),
+    sanitize(req.get('origin')),
+    sanitize(req.get('referer')),
+    sanitize(process.env.FRONTEND_URL),
+    sanitize(process.env.CLIENT_URL),
+    sanitize(process.env.APP_URL),
+  ];
+
+  // 1. Look for a trusted non-localhost candidate first (e.g. Vercel deployment)
+  for (const cand of candidates) {
+    if (cand && isTrustedDomain(cand) && !isLocalhost(cand)) {
+      return cand;
+    }
+  }
+
+  // 2. If configured FRONTEND_URL is set and not localhost, use it
+  const envFrontend = sanitize(process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.APP_URL);
+  if (envFrontend && (process.env.NODE_ENV !== 'production' || !isLocalhost(envFrontend))) {
+    return envFrontend;
+  }
+
+  // 3. Fall back to any trusted candidate (including localhost in dev)
+  for (const cand of candidates) {
+    if (cand && isTrustedDomain(cand)) {
+      return cand;
+    }
+  }
+
+  // 4. Default fallback
+  return 'http://localhost:3001';
+}
+
 // POST /auth/forgot-password
-// Generates a reset token and returns a reset link (no email needed for self-hosted setup)
+// Generates a reset token and dispatches reset instructions
 router.post('/forgot-password', async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -1102,13 +1195,14 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Email is required' });
     }
 
-    const user = await AuthDatabase.findUserByEmail(email.trim().toLowerCase());
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await AuthDatabase.findUserByEmail(cleanEmail);
 
     // Always respond success to prevent email enumeration attacks
     if (!user) {
       return res.json({
         success: true,
-        message: 'If an account with that email exists, a reset token has been generated.',
+        message: 'If an account with that email exists, password reset instructions have been dispatched.',
       });
     }
 
@@ -1116,9 +1210,14 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     const token = crypto.randomBytes(32).toString('hex');
     await AuthDatabase.createPasswordResetToken(user.id, token);
 
+    // Dynamically resolve the frontend URL (handles Vercel production, preview branches, and local dev)
+    const baseUrl = resolveFrontendBaseUrl(req);
+    const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+    console.log(`[AUTH] 🔑 Password reset generated for ${cleanEmail} -> Base URL: ${baseUrl} (Origin: ${req.get('origin') || 'none'})`);
+
     // Dispatch password reset email via EmailService
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/reset-password?token=${token}`;
-    await EmailService.sendPasswordResetEmail(user.email, resetUrl);
+    await EmailService.sendPasswordResetEmail(user.email, resetUrl, token);
 
     // Always return safe generic confirmation without leaking the token
     res.json({
@@ -1136,7 +1235,9 @@ router.post('/reset-password', async (req: Request, res: Response) => {
   try {
     const { token, newPassword } = req.body;
 
-    if (!token || !newPassword) {
+    const cleanToken = typeof token === 'string' ? token.trim() : '';
+
+    if (!cleanToken || !newPassword) {
       return res.status(400).json({ success: false, message: 'Token and new password are required' });
     }
 
@@ -1151,22 +1252,24 @@ router.post('/reset-password', async (req: Request, res: Response) => {
     }
 
     // Look up token
-    const resetRecord = await AuthDatabase.findPasswordResetToken(token);
+    const resetRecord = await AuthDatabase.findPasswordResetToken(cleanToken);
     if (!resetRecord) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset token. Please request a new link.' });
     }
 
     if (resetRecord.used) {
-      return res.status(400).json({ success: false, message: 'This reset token has already been used' });
+      return res.status(400).json({ success: false, message: 'This reset token has already been used. Please request a new link.' });
     }
 
     // Hash new password and update
     const newPasswordHash = await UserModel.hashPassword(newPassword);
     await AuthDatabase.updateUserPassword(resetRecord.userId, newPasswordHash);
-    await AuthDatabase.markPasswordResetTokenUsed(token);
+    await AuthDatabase.markPasswordResetTokenUsed(cleanToken);
 
     // Invalidate all active sessions for security
     await AuthDatabase.invalidateAllUserSessions(resetRecord.userId);
+
+    console.log(`[AUTH] ✅ Password successfully reset for user ${resetRecord.userId}`);
 
     res.json({ success: true, message: 'Password reset successfully. Please log in with your new password.' });
   } catch (error: any) {

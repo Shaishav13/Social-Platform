@@ -352,49 +352,76 @@ If you did not sign up for UdtaBirdie, please ignore this email.
   /**
    * Send password recovery email
    */
-  static async sendPasswordResetEmail(email: string, resetUrl: string): Promise<boolean> {
+  /**
+   * Send password recovery email
+   */
+  static async sendPasswordResetEmail(email: string, resetUrl: string, token?: string): Promise<boolean> {
     this.initTransporters();
+
+    // Extract token if not explicitly passed
+    let recoveryToken = token || '';
+    if (!recoveryToken) {
+      try {
+        const parsed = new URL(resetUrl);
+        recoveryToken = parsed.searchParams.get('token') || '';
+      } catch (_) {}
+    }
 
     const htmlContent = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #333333; margin: 0; padding: 20px; background-color: #f9f9f9; }
-    .container { max-width: 500px; margin: 0 auto; background: #ffffff; border: 1px solid #eaeaea; border-radius: 8px; padding: 30px; }
-    .header { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #111111; }
-    .body-text { font-size: 15px; line-height: 1.5; color: #555555; margin-bottom: 24px; }
-    .btn { display: inline-block; background: #e11d48; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 15px; }
-    .footer { border-top: 1px solid #eaeaea; padding-top: 20px; font-size: 13px; color: #999999; text-align: center; margin-top: 24px; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset your UdtaBirdie password</title>
 </head>
-<body>
-  <div class="container">
-    <div class="header">UdtaBirdie Socials</div>
-    <p class="body-text">
-      A password reset was requested for your account. Click the button below to choose a new password:
-    </p>
-    <div style="text-align: center; margin: 30px 0;">
-      <a href="${resetUrl}" class="btn">Reset Password</a>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #222222; margin: 0; padding: 24px; background-color: #f6f5f3;">
+  <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e3dc; border-radius: 8px; padding: 36px 30px;">
+    <div style="font-size: 22px; font-weight: 700; margin-bottom: 20px; color: #1a1918; letter-spacing: -0.02em;">
+      UdtaBirdie
     </div>
-    <p class="body-text" style="font-size: 14px;">
-      This link is valid for 1 hour. If you did not request a password reset, you can safely ignore this email.
+    <p style="font-size: 15px; line-height: 1.6; color: #444444; margin-bottom: 24px;">
+      A password reset was requested for your UdtaBirdie account (<strong>${email}</strong>). Click the button below to choose your new password:
     </p>
-    <div class="footer">
-      &copy; ${new Date().getFullYear()} UdtaBirdie Socials
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="${resetUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #832729; color: #ffffff; text-decoration: none; padding: 13px 30px; border-radius: 6px; font-weight: 600; font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        Reset Password
+      </a>
+    </div>
+    <p style="font-size: 13px; line-height: 1.5; color: #666666; margin-bottom: 16px;">
+      If the button above does not work in your email app, copy and paste this link into your browser:
+    </p>
+    <p style="font-size: 13px; line-height: 1.4; color: #832729; word-break: break-all; margin-bottom: 24px; background-color: #faf9f6; padding: 10px 12px; border-radius: 4px; border: 1px solid #eee;">
+      <a href="${resetUrl}" style="color: #832729; text-decoration: underline;">${resetUrl}</a>
+    </p>
+    ${recoveryToken ? `
+    <div style="background-color: #f7f6f2; border: 1px dashed #d5d3cc; border-radius: 6px; padding: 12px 16px; margin-bottom: 24px;">
+      <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #777; margin: 0 0 6px 0; font-weight: 600;">
+        Manual Recovery Token
+      </p>
+      <code style="font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; color: #111111; word-break: break-all;">${recoveryToken}</code>
+    </div>
+    ` : ''}
+    <p style="font-size: 13px; line-height: 1.5; color: #888888; margin-bottom: 0;">
+      This password reset link is valid for <strong>1 hour</strong>. If you did not request a password reset, no further action is needed and your account remains secure.
+    </p>
+    <div style="border-top: 1px solid #eae7df; padding-top: 20px; font-size: 12px; color: #999999; text-align: center; margin-top: 28px;">
+      &copy; ${new Date().getFullYear()} UdtaBirdie. All rights reserved.
     </div>
   </div>
 </body>
 </html>
 `;
 
-    const textContent = `UdtaBirdie Socials - Password Reset
+    const textContent = `UdtaBirdie - Password Reset
 
-A password reset was requested for your account. Reset link:
+A password reset was requested for your account (${email}).
+
+Reset link:
 ${resetUrl}
 
-This link is valid for 1 hour. If you did not request this, ignore this email.`;
+${recoveryToken ? `Manual Recovery Token:\n${recoveryToken}\n\n` : ''}
+This link is valid for 1 hour. If you did not request this, you can safely ignore this message.`;
 
     const subject = 'Reset your UdtaBirdie password';
 
@@ -403,7 +430,12 @@ This link is valid for 1 hour. If you did not request this, ignore this email.`;
       return true;
     }
 
-    // 1. SECONDARY: Brevo SMTP relay
+    // 1. SECONDARY REST API: Resend (port 443, works on cloud hosting)
+    if (await this.sendViaResend(email, subject, htmlContent, textContent)) {
+      return true;
+    }
+
+    // 2. TERTIARY: Brevo SMTP relay
     if (this.brevoTransporter) {
       try {
         const info = await this.brevoTransporter.sendMail({
@@ -420,7 +452,7 @@ This link is valid for 1 hour. If you did not request this, ignore this email.`;
       }
     }
 
-    // 2. FALLBACK: Gmail SMTP
+    // 3. FALLBACK: Gmail SMTP
     if (this.gmailTransporter) {
       try {
         const info = await this.gmailTransporter.sendMail({

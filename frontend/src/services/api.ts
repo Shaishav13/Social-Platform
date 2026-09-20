@@ -28,10 +28,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
+      // Clear token
       localStorage.removeItem('authToken');
       localStorage.removeItem('refreshToken');
-      window.location.href = '/login';
+      const isAuthPath = ['/login', '/register', '/forgot-password', '/reset-password'].some(path =>
+        window.location.pathname.startsWith(path)
+      );
+      if (!isAuthPath) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
