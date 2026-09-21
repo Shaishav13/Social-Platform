@@ -1111,77 +1111,68 @@ function resolveFrontendBaseUrl(req: Request): string {
   const isLocalhost = (originStr: string): boolean => {
     try {
       const u = new URL(originStr);
-      return u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '0.0.0.0';
+      return (
+        u.hostname === 'localhost' ||
+        u.hostname === '127.0.0.1' ||
+        u.hostname === '0.0.0.0' ||
+        u.hostname.startsWith('192.168.') ||
+        u.hostname.startsWith('10.') ||
+        u.hostname.endsWith('.local')
+      );
     } catch {
       return false;
     }
   };
 
-  const isTrustedDomain = (originStr: string): boolean => {
-    try {
-      const u = new URL(originStr);
-      const host = u.hostname.toLowerCase();
-      // Allow localhost in development or local testing
-      if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') return true;
-      // Allow standard frontend hosting providers
-      if (
-        host.endsWith('.vercel.app') ||
-        host.endsWith('.pages.dev') ||
-        host.endsWith('.netlify.app') ||
-        host.endsWith('.onrender.com')
-      ) {
-        return true;
-      }
-      // Check against configured allowed origins
-      const configured = [
-        process.env.FRONTEND_URL,
-        process.env.CLIENT_URL,
-        process.env.APP_URL,
-        ...(process.env.ALLOWED_ORIGINS || '').split(','),
-      ]
-        .map(s => (s ? sanitize(s) : null))
-        .filter(Boolean) as string[];
-
-      if (configured.some(cfg => cfg === originStr)) return true;
-      if ((process.env.ALLOWED_ORIGINS || '').includes('*')) return true;
-
-      return false;
-    } catch {
-      return false;
-    }
-  };
-
-  // Order of preference for candidate origins
-  const candidates: (string | null)[] = [
-    sanitize(req.body?.frontendUrl),
-    sanitize(req.get('origin')),
-    sanitize(req.get('referer')),
-    sanitize(process.env.FRONTEND_URL),
-    sanitize(process.env.CLIENT_URL),
-    sanitize(process.env.APP_URL),
-  ];
-
-  // 1. Look for a trusted non-localhost candidate first (e.g. Vercel deployment)
-  for (const cand of candidates) {
-    if (cand && isTrustedDomain(cand) && !isLocalhost(cand)) {
-      return cand;
-    }
-  }
-
-  // 2. If configured FRONTEND_URL is set and not localhost, use it
+  // Collect candidate origins from environment and incoming request
   const envFrontend = sanitize(process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.APP_URL);
-  if (envFrontend && (process.env.NODE_ENV !== 'production' || !isLocalhost(envFrontend))) {
+  const bodyFrontend = sanitize(req.body?.frontendUrl);
+  const originHeader = sanitize(req.get('origin'));
+  const refererHeader = sanitize(req.get('referer'));
+  const forwardedHost = req.headers['x-forwarded-host']
+    ? sanitize(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}`)
+    : null;
+
+  // 1. If an explicit, non-localhost FRONTEND_URL is configured in environment, use it
+  if (envFrontend && !isLocalhost(envFrontend)) {
     return envFrontend;
   }
 
-  // 3. Fall back to any trusted candidate (including localhost in dev)
-  for (const cand of candidates) {
-    if (cand && isTrustedDomain(cand)) {
-      return cand;
-    }
+  // 2. Prioritize any valid HTTPS origin from the request.
+  // In production (e.g. Vercel, custom domain), the browser sends its actual HTTPS origin via Origin, Referer, or body.
+  const requestHttpsCandidates = [bodyFrontend, originHeader, refererHeader, forwardedHost].filter(
+    (c): c is string => Boolean(c && c.startsWith('https://') && !isLocalhost(c))
+  );
+  if (requestHttpsCandidates.length > 0) {
+    return requestHttpsCandidates[0];
   }
 
-  // 4. Default fallback
+  // 3. Check ALLOWED_ORIGINS for any production HTTPS domain
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(s => sanitize(s))
+    .filter((s): s is string => Boolean(s && s.startsWith('https://') && !isLocalhost(s)));
+  if (allowedOrigins.length > 0) {
+    return allowedOrigins[0];
+  }
+
+  // 4. If any non-localhost candidate exists (e.g. deployed on HTTP or custom cloud port)
+  const nonLocalCandidates = [bodyFrontend, originHeader, refererHeader, forwardedHost].filter(
+    (c): c is string => Boolean(c && !isLocalhost(c))
+  );
+  if (nonLocalCandidates.length > 0) {
+    return nonLocalCandidates[0];
+  }
+
+  // 5. In local development or testing, use the caller's origin if available (e.g. http://localhost:3001)
+  const localCandidates = [bodyFrontend, originHeader, refererHeader, envFrontend].filter(
+    (c): c is string => Boolean(c)
+  );
+  if (localCandidates.length > 0) {
+    return localCandidates[0];
+  }
+
+  // 6. Default fallback
   return 'http://localhost:3001';
 }
 
@@ -1206,21 +1197,24 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
       });
     }
 
-    // Generate a secure random token
+    // Generate a secure random token and record in database
     const token = crypto.randomBytes(32).toString('hex');
     await AuthDatabase.createPasswordResetToken(user.id, token);
 
-    // Dynamically resolve the frontend URL (handles Vercel production, preview branches, and local dev)
+    // Dynamically resolve the frontend URL (handles Vercel production, preview branches, custom domains, and local dev)
     const baseUrl = resolveFrontendBaseUrl(req);
     const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
-    console.log(`[AUTH] 🔑 Password reset generated for ${cleanEmail} -> Base URL: ${baseUrl} (Origin: ${req.get('origin') || 'none'})`);
+    console.log(`[AUTH] 🔑 Password reset generated for ${cleanEmail} -> Base URL: ${baseUrl} (Origin: ${req.get('origin') || req.body?.frontendUrl || 'none'})`);
 
-    // Dispatch password reset email via EmailService
-    await EmailService.sendPasswordResetEmail(user.email, resetUrl, token);
+    // Dispatch password reset email asynchronously in background so the HTTP request returns immediately (< 50ms)
+    // This prevents the frontend button from hanging on "Generating Link..." while waiting for SMTP
+    EmailService.sendPasswordResetEmail(user.email, resetUrl, token).catch((err) => {
+      console.error('[AUTH] ❌ Background password reset email dispatch failed:', err);
+    });
 
-    // Always return safe generic confirmation without leaking the token
-    res.json({
+    // Respond immediately with success
+    return res.json({
       success: true,
       message: 'If an account with that email exists, password reset instructions have been dispatched.',
     });
