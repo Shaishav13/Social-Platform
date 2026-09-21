@@ -11,6 +11,7 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ConfigProvider } from './contexts/ConfigContext';
 import Layout from './components/Layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
@@ -27,7 +28,6 @@ import CreatePostPage from './pages/CreatePost';
 import PostDetail from './pages/PostDetail';
 import Notifications from './pages/Notifications';
 import FollowRequests from './pages/FollowRequests';
-import TestFollowRequests from './pages/TestFollowRequests';
 import Search from './pages/Search';
 import Explore from './pages/Explore';
 import Settings from './pages/Settings';
@@ -44,8 +44,9 @@ import './styles/wren.css';
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Layout>
+      <ConfigProvider>
+        <Router>
+          <Layout>
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<Home />} />
@@ -119,11 +120,6 @@ function App() {
                 <FollowRequests />
               </ProtectedRoute>
             } />
-            <Route path="/test-follow-requests" element={
-              <ProtectedRoute>
-                <TestFollowRequests />
-              </ProtectedRoute>
-            } />
             <Route path="/search" element={
               <ProtectedRoute>
                 <Search />
@@ -179,7 +175,8 @@ function App() {
           </Routes>
         </Layout>
       </Router>
-    </AuthProvider>
+    </ConfigProvider>
+  </AuthProvider>
   );
 }
 

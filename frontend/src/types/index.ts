@@ -132,8 +132,15 @@ export interface Post {
   commentCount: number;
   shareCount: number;
   isPublic: boolean;
+  allowReposts?: boolean;
   isLiked?: boolean;
   isSaved?: boolean;
+  isReposted?: boolean;
+  repostedBy?: {
+    id: string;
+    username: string;
+    profilePicture?: string;
+  } | null;
   savedAt?: string;
   createdAt: string;
   updatedAt: string;

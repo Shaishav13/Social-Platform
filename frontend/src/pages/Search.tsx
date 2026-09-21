@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { Post, User } from '../types';
-import PostCard from '../components/Social/PostCard';
 import { Icon } from '../components/ui';
+import { PostCard } from '../components/wren';
 import api from '../services/api';
 
 // Debounce hook

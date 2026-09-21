@@ -1,5 +1,6 @@
 import { DatabaseConnection } from '../../config/database';
 import { RedisConnection } from '../../config/redis';
+import { updateRateLimiterPoints } from '../../middleware/rateLimiter';
 import bcrypt from 'bcrypt';
 
 export interface AdminUserRecord {
@@ -297,19 +298,76 @@ export class AdminDatabase {
     };
   }
 
+  static async initializeTables(): Promise<void> {
+    try {
+      await DatabaseConnection.query(`
+        CREATE TABLE IF NOT EXISTS platform_features (
+          id INT PRIMARY KEY DEFAULT 1,
+          public_registration BOOLEAN DEFAULT true,
+          media_uploads BOOLEAN DEFAULT true,
+          commenting BOOLEAN DEFAULT true,
+          follow_requests BOOLEAN DEFAULT true,
+          maintenance_mode BOOLEAN DEFAULT false,
+          trending_feed BOOLEAN DEFAULT true,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS platform_settings (
+          id INT PRIMARY KEY DEFAULT 1,
+          site_name VARCHAR(100) DEFAULT 'UdtaBirdie',
+          announcement_banner TEXT DEFAULT '',
+          default_density VARCHAR(20) DEFAULT 'comfortable',
+          max_post_length INT DEFAULT 2000,
+          rate_limit_max_requests INT DEFAULT 100,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        INSERT INTO platform_features (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+        INSERT INTO platform_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+      `);
+      await this.getFeatures(true);
+      await this.getSettings(true);
+      console.log('✅ Admin platform tables and settings initialized');
+    } catch (err) {
+      console.error('Failed to initialize platform admin tables:', err);
+    }
+  }
+
   static async deleteUser(userId: string): Promise<boolean> {
     const res = await DatabaseConnection.query('DELETE FROM users WHERE id = $1', [userId]);
     return (res.rowCount || 0) > 0;
   }
 
-  static async getFeatures(): Promise<PlatformFeatures> {
+  static async getFeatures(forceRefresh = false): Promise<PlatformFeatures> {
+    if (!forceRefresh && memoryFeatures) {
+      return memoryFeatures;
+    }
     try {
       const client = RedisConnection.getClient();
-      if (client) {
+      if (client && !forceRefresh) {
         const cached = await client.get('platform:features');
         if (cached) {
-          return JSON.parse(cached);
+          memoryFeatures = JSON.parse(cached);
+          return memoryFeatures;
         }
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    try {
+      const res = await DatabaseConnection.query('SELECT * FROM platform_features WHERE id = 1');
+      if (res.rows.length > 0) {
+        const row = res.rows[0];
+        memoryFeatures = {
+          publicRegistration: row.public_registration ?? true,
+          mediaUploads: row.media_uploads ?? true,
+          commenting: row.commenting ?? true,
+          followRequests: row.follow_requests ?? true,
+          maintenanceMode: row.maintenance_mode ?? false,
+          trendingFeed: row.trending_feed ?? true,
+        };
+        return memoryFeatures;
       }
     } catch (e) {
       // fallback to in-memory
@@ -318,11 +376,37 @@ export class AdminDatabase {
   }
 
   static async updateFeatures(newFeatures: Partial<PlatformFeatures>): Promise<PlatformFeatures> {
-    memoryFeatures = { ...memoryFeatures, ...newFeatures };
+    const current = await this.getFeatures();
+    const updated: PlatformFeatures = { ...current, ...newFeatures };
+    memoryFeatures = updated;
+
+    try {
+      await DatabaseConnection.query(`
+        UPDATE platform_features SET
+          public_registration = $1,
+          media_uploads = $2,
+          commenting = $3,
+          follow_requests = $4,
+          maintenance_mode = $5,
+          trending_feed = $6,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+      `, [
+        updated.publicRegistration,
+        updated.mediaUploads,
+        updated.commenting,
+        updated.followRequests,
+        updated.maintenanceMode,
+        updated.trendingFeed,
+      ]);
+    } catch (err) {
+      console.error('Failed to persist features to DB:', err);
+    }
+
     try {
       const client = RedisConnection.getClient();
       if (client) {
-        await client.set('platform:features', JSON.stringify(memoryFeatures));
+        await client.set('platform:features', JSON.stringify(updated));
       }
     } catch (e) {
       // ignore redis error
@@ -330,14 +414,35 @@ export class AdminDatabase {
     return memoryFeatures;
   }
 
-  static async getSettings(): Promise<PlatformSettings> {
+  static async getSettings(forceRefresh = false): Promise<PlatformSettings> {
+    if (!forceRefresh && memorySettings) {
+      return memorySettings;
+    }
     try {
       const client = RedisConnection.getClient();
-      if (client) {
+      if (client && !forceRefresh) {
         const cached = await client.get('platform:settings');
         if (cached) {
-          return JSON.parse(cached);
+          memorySettings = JSON.parse(cached);
+          return memorySettings;
         }
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    try {
+      const res = await DatabaseConnection.query('SELECT * FROM platform_settings WHERE id = 1');
+      if (res.rows.length > 0) {
+        const row = res.rows[0];
+        memorySettings = {
+          siteName: row.site_name || 'UdtaBirdie',
+          announcementBanner: row.announcement_banner || '',
+          defaultDensity: row.default_density || 'comfortable',
+          maxPostLength: row.max_post_length || 2000,
+          rateLimitMaxRequests: row.rate_limit_max_requests || 100,
+        };
+        return memorySettings;
       }
     } catch (e) {
       // fallback
@@ -346,15 +451,44 @@ export class AdminDatabase {
   }
 
   static async updateSettings(newSettings: Partial<PlatformSettings>): Promise<PlatformSettings> {
-    memorySettings = { ...memorySettings, ...newSettings };
+    const current = await this.getSettings();
+    const updated: PlatformSettings = { ...current, ...newSettings };
+    memorySettings = updated;
+
+    try {
+      await DatabaseConnection.query(`
+        UPDATE platform_settings SET
+          site_name = $1,
+          announcement_banner = $2,
+          default_density = $3,
+          max_post_length = $4,
+          rate_limit_max_requests = $5,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+      `, [
+        updated.siteName,
+        updated.announcementBanner,
+        updated.defaultDensity,
+        updated.maxPostLength,
+        updated.rateLimitMaxRequests,
+      ]);
+    } catch (err) {
+      console.error('Failed to persist settings to DB:', err);
+    }
+
     try {
       const client = RedisConnection.getClient();
       if (client) {
-        await client.set('platform:settings', JSON.stringify(memorySettings));
+        await client.set('platform:settings', JSON.stringify(updated));
       }
     } catch (e) {
       // ignore redis error
     }
+
+    if (typeof updated.rateLimitMaxRequests === 'number') {
+      updateRateLimiterPoints(updated.rateLimitMaxRequests);
+    }
+
     return memorySettings;
   }
 
@@ -369,6 +503,7 @@ export class AdminDatabase {
         FROM reports r
         LEFT JOIN users u ON r.reporter_id = u.id
         LEFT JOIN posts p ON r.target_id = p.id AND r.target_type = 'post'
+        WHERE r.status = 'pending'
         ORDER BY r.created_at DESC
         LIMIT 50
       `);

@@ -74,7 +74,7 @@ const upload = multer({
 router.post('/posts', authenticateToken, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user?.userId;
-    const { content, mediaIds, isPublic } = req.body;
+    const { content, mediaIds, isPublic, allowReposts } = req.body;
 
     if (!userId) {
       res.status(401).json({
@@ -89,6 +89,32 @@ router.post('/posts', authenticateToken, async (req: Request, res: Response): Pr
       res.status(400).json({
         error: 'Invalid input',
         message: 'Post content is required and must be a string'
+      });
+      return;
+    }
+
+    const userRole = (req as any).user?.role;
+    const { AdminDatabase } = await import('../admin/database');
+    const [features, settings] = await Promise.all([
+      AdminDatabase.getFeatures(),
+      AdminDatabase.getSettings()
+    ]);
+
+    // Check media uploads feature flag
+    if (mediaIds && mediaIds.length > 0 && !features.mediaUploads && userRole !== 'admin') {
+      res.status(403).json({
+        error: 'Media uploads suspended',
+        message: 'Manuscript media & imagery attachments are currently suspended by platform administrators.'
+      });
+      return;
+    }
+
+    // Check dynamic max post length setting
+    const maxLen = settings.maxPostLength || 2000;
+    if (content.length > maxLen) {
+      res.status(400).json({
+        error: 'Content too long',
+        message: `Post content exceeds the maximum allowed length of ${maxLen} characters.`
       });
       return;
     }
@@ -128,7 +154,8 @@ router.post('/posts', authenticateToken, async (req: Request, res: Response): Pr
     const post = await PostModel.createPost(userId!, {
       content,
       mediaIds: mediaIds || [],
-      isPublic: isPublic !== false // Default to true if not specified
+      isPublic: isPublic !== false, // Default to true if not specified
+      allowReposts: Boolean(allowReposts)
     });
 
     // Handle mentions in post content
@@ -150,6 +177,7 @@ router.post('/posts', authenticateToken, async (req: Request, res: Response): Pr
         commentCount: post.commentCount,
         shareCount: post.shareCount,
         isPublic: post.isPublic,
+        allowReposts: post.allowReposts,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt
       }
@@ -317,6 +345,7 @@ router.get('/posts/:id', async (req: Request, res: Response): Promise<void> => {
         commentCount: post.commentCount,
         shareCount: post.shareCount,
         isPublic: post.isPublic,
+        allowReposts: post.allowReposts,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt
       },
@@ -333,6 +362,7 @@ router.get('/posts/:id', async (req: Request, res: Response): Promise<void> => {
         commentCount: post.commentCount,
         shareCount: post.shareCount,
         isPublic: post.isPublic,
+        allowReposts: post.allowReposts,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt
       }
@@ -352,7 +382,7 @@ router.put('/posts/:id', authenticateToken, async (req: Request, res: Response):
   try {
     const { id } = req.params;
     const userId = (req as any).user?.userId;
-    const { content, isPublic } = req.body;
+    const { content, isPublic, allowReposts } = req.body;
 
     if (!userId) {
       res.status(401).json({
@@ -386,7 +416,8 @@ router.put('/posts/:id', authenticateToken, async (req: Request, res: Response):
     // Update the post
     const updatedPost = await PostModel.updatePost(id, userId!, {
       content,
-      isPublic
+      isPublic,
+      allowReposts: allowReposts !== undefined ? Boolean(allowReposts) : undefined
     });
 
     if (!updatedPost) {
@@ -418,6 +449,7 @@ router.put('/posts/:id', authenticateToken, async (req: Request, res: Response):
         commentCount: updatedPost.commentCount,
         shareCount: updatedPost.shareCount,
         isPublic: updatedPost.isPublic,
+        allowReposts: updatedPost.allowReposts,
         createdAt: updatedPost.createdAt,
         updatedAt: updatedPost.updatedAt
       }
@@ -489,6 +521,17 @@ router.post('/upload', authenticateToken, upload.fields([{ name: 'files', maxCou
     const filesObj = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     const files = (filesObj?.files || []).concat(filesObj?.media || []);
     const userId = (req as any).user.userId;
+
+    const userRole = (req as any).user?.role;
+    const { AdminDatabase } = await import('../admin/database');
+    const features = await AdminDatabase.getFeatures();
+    if (!features.mediaUploads && userRole !== 'admin') {
+      res.status(403).json({
+        error: 'Media uploads suspended',
+        message: 'Manuscript media and imagery uploads are currently suspended by platform administrators.'
+      });
+      return;
+    }
 
     if (!files || files.length === 0) {
       res.status(400).json({
@@ -734,8 +777,11 @@ router.get('/feed', optionalAuth, async (req: Request, res: Response): Promise<v
         commentCount: post.commentCount,
         shareCount: post.shareCount,
         isPublic: post.isPublic,
+        allowReposts: post.allowReposts,
         isLiked: post.isLiked, // Include like status
         isSaved: (post as any).isSaved || false,
+        isReposted: post.isReposted || false,
+        repostedBy: post.repostedBy || null,
         createdAt: post.createdAt,
         updatedAt: post.updatedAt
       })),

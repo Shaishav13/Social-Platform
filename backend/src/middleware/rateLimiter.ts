@@ -4,6 +4,12 @@ import { RedisConnection } from '../config/redis';
 
 let rateLimiterInstance: RateLimiterRedis;
 
+export const updateRateLimiterPoints = (points: number): void => {
+  if (rateLimiterInstance) {
+    (rateLimiterInstance as any).points = points;
+  }
+};
+
 // Initialize rate limiter (will be called after Redis connection is established)
 export const initializeRateLimiter = (): void => {
   const redisClient = RedisConnection.getClient();

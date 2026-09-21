@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { User } from '../../types';
+import { useConfig } from '../../contexts/ConfigContext';
 import { Icon } from '../ui';
 import { resolveMediaUrl } from '../../utils/media';
 
@@ -29,6 +30,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   onFollowersClick,
   onFollowingClick,
 }) => {
+  const { features } = useConfig();
   const [followHovered, setFollowHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -93,10 +95,13 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           ) : (
             <button
               type="button"
-              onClick={onFollowToggle}
+              onClick={features.followRequests || isFollowing ? onFollowToggle : undefined}
               onMouseEnter={() => setFollowHovered(true)}
               onMouseLeave={() => setFollowHovered(false)}
+              disabled={!features.followRequests && !isFollowing}
               className={`wren-btn-follow ${isFollowing ? 'is-following' : ''}`}
+              style={!features.followRequests && !isFollowing ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+              title={!features.followRequests && !isFollowing ? 'Author subscriptions are temporarily paused by administration' : undefined}
               aria-label={isFollowing ? 'Unfollow user' : 'Follow user'}
             >
               {isFollowing ? (followHovered ? 'Unfollow' : 'Following') : 'Follow'}

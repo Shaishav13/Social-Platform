@@ -101,6 +101,8 @@ export class ContentDatabase {
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         );
+
+        ALTER TABLE posts ADD COLUMN IF NOT EXISTS allow_reposts BOOLEAN NOT NULL DEFAULT false;
       `);
 
       // Create media_files table
@@ -189,10 +191,10 @@ export class ContentDatabase {
       }
 
       const result = await client.query(
-        `INSERT INTO posts (id, author_id, content, media_urls, media_type, is_public)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO posts (id, author_id, content, media_urls, media_type, is_public, allow_reposts)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [postId, authorId, postData.content, mediaUrls, mediaType, postData.isPublic ?? true]
+        [postId, authorId, postData.content, mediaUrls, mediaType, postData.isPublic ?? true, Boolean(postData.allowReposts)]
       );
 
       const post = this.mapRowToPost(result.rows[0]);
@@ -351,6 +353,11 @@ export class ContentDatabase {
       if (updates.isPublic !== undefined) {
         updateFields.push(`is_public = $${paramCount++}`);
         values.push(updates.isPublic);
+      }
+
+      if (updates.allowReposts !== undefined) {
+        updateFields.push(`allow_reposts = $${paramCount++}`);
+        values.push(Boolean(updates.allowReposts));
       }
 
       if (updateFields.length === 0) {
@@ -581,6 +588,7 @@ export class ContentDatabase {
       commentCount: row.comment_count,
       shareCount: row.share_count,
       isPublic: row.is_public,
+      allowReposts: Boolean(row.allow_reposts),
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at)
     };
@@ -607,20 +615,22 @@ export class ContentDatabase {
     sortBy?: 'chronological' | 'algorithmic';
     followingOnly?: boolean;
   }): Promise<PostWithMedia[]> {
-    // Use getFeedWithLikes to include author information
-    const feedOptions: { limit: number; offset: number; userId?: string } = {
+    return await this.getFeedWithLikes({
       limit: options.limit,
-      offset: options.offset
-    };
-    
-    if (options.userId) {
-      feedOptions.userId = options.userId;
-    }
-    
-    return await this.getFeedWithLikes(feedOptions);
+      offset: options.offset,
+      userId: options.userId,
+      followingOnly: options.followingOnly,
+      sortBy: options.sortBy
+    });
   }
 
-  static async getFeedWithLikes(options: { limit: number; offset: number; userId?: string }): Promise<PostWithMedia[]> {
+  static async getFeedWithLikes(options: { 
+    limit: number; 
+    offset: number; 
+    userId?: string; 
+    followingOnly?: boolean; 
+    sortBy?: 'chronological' | 'algorithmic';
+  }): Promise<PostWithMedia[]> {
     const client = await DatabaseConnection.getClient();
     
     try {
@@ -628,40 +638,105 @@ export class ContentDatabase {
       let paramCount = 1;
       
       let query = `
-        SELECT p.*,
+        WITH feed_items AS (
+          -- Original posts
+          SELECT 
+            p.id,
+            p.author_id,
+            p.content,
+            p.media_urls,
+            p.media_type,
+            p.like_count,
+            p.comment_count,
+            p.share_count,
+            p.is_public,
+            p.allow_reposts,
+            p.created_at,
+            p.updated_at,
+            p.created_at AS activity_at,
+            NULL::uuid AS reposter_id,
+            NULL::varchar AS reposter_username,
+            NULL::text AS reposter_profile_picture
+          FROM posts p
+          WHERE p.is_public = true
+
+          UNION ALL
+
+          -- Reposted posts (shares)
+          SELECT 
+            p.id,
+            p.author_id,
+            p.content,
+            p.media_urls,
+            p.media_type,
+            p.like_count,
+            p.comment_count,
+            p.share_count,
+            p.is_public,
+            p.allow_reposts,
+            p.created_at,
+            p.updated_at,
+            s.created_at AS activity_at,
+            s.user_id AS reposter_id,
+            ru.username AS reposter_username,
+            ru.profile_picture AS reposter_profile_picture
+          FROM shares s
+          JOIN posts p ON s.post_id = p.id
+          JOIN users ru ON s.user_id = ru.id
+          WHERE p.is_public = true AND p.allow_reposts = true
+        )
+        SELECT f.*,
                u.username as author_username,
                u.profile_picture as author_profile_picture
       `;
       
-      // Add like and save status if user is provided
+      // Add like, save, and repost status for the current viewer
       if (options.userId) {
         query += `,
                CASE WHEN l.id IS NOT NULL THEN true ELSE false END as is_liked,
-               CASE WHEN sp.id IS NOT NULL THEN true ELSE false END as is_saved
+               CASE WHEN sp.id IS NOT NULL THEN true ELSE false END as is_saved,
+               CASE WHEN cur_s.id IS NOT NULL THEN true ELSE false END as is_reposted
         `;
       }
       
       query += `
-        FROM posts p
-        LEFT JOIN users u ON p.author_id = u.id
+        FROM feed_items f
+        JOIN users u ON f.author_id = u.id
       `;
       
-      // Add left join for likes and saved_posts if user is provided
       if (options.userId) {
         query += `
-        LEFT JOIN likes l ON p.id = l.target_id 
+        LEFT JOIN likes l ON f.id = l.target_id 
                          AND l.target_type = 'post' 
                          AND l.user_id = $${paramCount++}
-        LEFT JOIN saved_posts sp ON p.id = sp.post_id
+        LEFT JOIN saved_posts sp ON f.id = sp.post_id
                                 AND sp.user_id = $${paramCount++}
+        LEFT JOIN shares cur_s ON f.id = cur_s.post_id
+                              AND cur_s.user_id = $${paramCount++}
         `;
-        params.push(options.userId, options.userId);
+        params.push(options.userId, options.userId, options.userId);
       }
       
-      query += `
-        WHERE p.is_public = true
-      `;
+      query += ` WHERE 1=1`;
       
+      // Filter by following only if requested
+      if (options.followingOnly && options.userId) {
+        query += `
+          AND (
+            (f.reposter_id IS NULL AND (
+              f.author_id = $${paramCount++} 
+              OR EXISTS (SELECT 1 FROM follows f_fl WHERE f_fl.follower_id = $${paramCount++} AND f_fl.following_id = f.author_id)
+            ))
+            OR
+            (f.reposter_id IS NOT NULL AND (
+              f.reposter_id = $${paramCount++} 
+              OR EXISTS (SELECT 1 FROM follows f_fl2 WHERE f_fl2.follower_id = $${paramCount++} AND f_fl2.following_id = f.reposter_id)
+            ))
+          )
+        `;
+        params.push(options.userId, options.userId, options.userId, options.userId);
+      }
+
       // Filter out posts from private accounts unless user is following them
       if (options.userId) {
         query += `
@@ -669,15 +744,14 @@ export class ContentDatabase {
             u.is_private = false 
             OR u.id = $${paramCount++}
             OR EXISTS (
-              SELECT 1 FROM follows f 
-              WHERE f.follower_id = $${paramCount++} 
-              AND f.following_id = u.id
+              SELECT 1 FROM follows f_pr 
+              WHERE f_pr.follower_id = $${paramCount++} 
+              AND f_pr.following_id = u.id
             )
           )
         `;
         params.push(options.userId, options.userId);
       } else {
-        // Not authenticated - only show posts from public accounts
         query += ` AND u.is_private = false`;
       }
       
@@ -696,7 +770,7 @@ export class ContentDatabase {
       }
       
       query += `
-        ORDER BY p.created_at DESC
+        ORDER BY f.activity_at DESC
         LIMIT $${paramCount++} OFFSET $${paramCount++}
       `;
 
@@ -704,13 +778,18 @@ export class ContentDatabase {
 
       const result = await client.query(query, params);
 
-      // Convert to PostWithMedia format with proper media URLs from database
       return result.rows.map(row => {
         const post = this.mapRowToPost(row);
         return {
           ...post,
-          isLiked: options.userId ? row.is_liked : undefined,
-          isSaved: options.userId ? row.is_saved : undefined,
+          isLiked: options.userId ? Boolean(row.is_liked) : false,
+          isSaved: options.userId ? Boolean(row.is_saved) : false,
+          isReposted: options.userId ? Boolean(row.is_reposted) : false,
+          repostedBy: row.reposter_id ? {
+            id: row.reposter_id,
+            username: row.reposter_username,
+            profilePicture: row.reposter_profile_picture
+          } : null,
           author: {
             id: post.authorId,
             username: row.author_username,

@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import type { Comment, User } from '../../types';
+import { useConfig } from '../../contexts/ConfigContext';
 import api from '../../services/api';
 import { RichText } from '../ui/RichText';
+import { useMentionAutocomplete, MentionDropdown } from '../ui';
 
 interface CommentSectionProps {
   postId: string;
@@ -81,8 +83,19 @@ const CommentItem: React.FC<CommentItemProps> = ({
   comment, isReply = false, currentUser, postId,
   isHighlighted = false, highlightRef, onReplyAdded,
 }) => {
+  const { features } = useConfig();
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const replyInputRef = useRef<HTMLInputElement>(null);
+  const {
+    isOpen: isReplyMentionOpen,
+    suggestions: replyMentionSuggestions,
+    activeIndex: replyMentionActiveIndex,
+    isLoading: isReplyMentionLoading,
+    checkForMention: checkReplyMention,
+    handleKeyDown: handleReplyMentionKeyDown,
+    selectUser: selectReplyMentionUser,
+  } = useMentionAutocomplete(replyText, setReplyText, replyInputRef);
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   const [isLiked, setIsLiked] = useState(comment.isLiked || false);
   const [likeCount, setLikeCount] = useState(comment.likeCount || 0);
@@ -202,7 +215,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             {likeCount > 0 && <span>{likeCount}</span>}
           </button>
 
-          {!isReply && currentUser && (
+          {!isReply && currentUser && features.commenting && (
             <button
               onClick={() => {
                 setShowReplyForm(s => {
@@ -229,13 +242,22 @@ const CommentItem: React.FC<CommentItemProps> = ({
         {showReplyForm && currentUser && (
           <form onSubmit={handleSubmitReply} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '10px' }}>
             <Avatar username={currentUser.username} profilePicture={currentUser.profilePicture} size={28} />
-            <div style={{ flex: 1, display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: 1, display: 'flex', gap: '6px', alignItems: 'center' }}>
               <input
+                ref={replyInputRef}
                 autoFocus
                 type="text"
                 value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                placeholder={`Reply to ${comment.author?.username || 'this comment'}â€¦`}
+                onChange={e => {
+                  setReplyText(e.target.value);
+                  checkReplyMention();
+                }}
+                onKeyUp={checkReplyMention}
+                onClick={checkReplyMention}
+                onKeyDown={e => {
+                  if (handleReplyMentionKeyDown(e)) return;
+                }}
+                placeholder={`Reply to ${comment.author?.username || 'this comment'}…`}
                 disabled={isSubmittingReply}
                 style={{
                   flex: 1, padding: '8px 14px',
@@ -246,6 +268,14 @@ const CommentItem: React.FC<CommentItemProps> = ({
                 }}
                 onFocus={e => (e.target.style.borderColor = 'var(--wine-700, #8b2438)')}
                 onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+              />
+              <MentionDropdown
+                isOpen={isReplyMentionOpen}
+                suggestions={replyMentionSuggestions}
+                activeIndex={replyMentionActiveIndex}
+                isLoading={isReplyMentionLoading}
+                onSelect={selectReplyMentionUser}
+                style={{ bottom: '100%', left: 0, marginBottom: '6px' }}
               />
               <button
                 type="submit"
@@ -316,8 +346,19 @@ const CommentItem: React.FC<CommentItemProps> = ({
 const CommentSection: React.FC<CommentSectionProps> = ({
   postId, currentUser, highlightCommentId, onCommentCountChange,
 }) => {
+  const { features } = useConfig();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const commentInputRef = useRef<HTMLInputElement>(null);
+  const {
+    isOpen: isCommentMentionOpen,
+    suggestions: commentMentionSuggestions,
+    activeIndex: commentMentionActiveIndex,
+    isLoading: isCommentMentionLoading,
+    checkForMention: checkCommentMention,
+    handleKeyDown: handleCommentMentionKeyDown,
+    selectUser: selectCommentMentionUser,
+  } = useMentionAutocomplete(newComment, setNewComment, commentInputRef);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const highlightedRef = useRef<HTMLDivElement | null>(null);
@@ -404,11 +445,29 @@ const CommentSection: React.FC<CommentSectionProps> = ({
       </div>
 
       {/* Comment input */}
-      {currentUser ? (
+      {!features.commenting ? (
+        <div style={{
+          padding: '14px 18px',
+          backgroundColor: 'var(--paper-200)',
+          borderRadius: '8px',
+          border: '1px solid var(--border)',
+          color: 'var(--ink-600)',
+          fontSize: '13.5px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontStyle: 'italic',
+        }}>
+          <span role="img" aria-label="Closed">🔒</span>
+          <span>Dialogue & marginalia replies are temporarily paused by platform administrators.</span>
+        </div>
+      ) : currentUser ? (
         <form onSubmit={handleSubmitComment} style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <Avatar username={currentUser.username} profilePicture={currentUser.profilePicture} size={38} />
             <div style={{
+              position: 'relative',
               flex: 1, display: 'flex', alignItems: 'center', gap: '8px',
               padding: '6px 6px 6px 16px',
               backgroundColor: 'var(--paper-200)',
@@ -416,15 +475,32 @@ const CommentSection: React.FC<CommentSectionProps> = ({
               border: '1.5px solid var(--border)',
             }}>
               <input
+                ref={commentInputRef}
                 type="text"
                 value={newComment}
-                onChange={e => setNewComment(e.target.value)}
-                placeholder="Add a commentâ€¦"
+                onChange={e => {
+                  setNewComment(e.target.value);
+                  checkCommentMention();
+                }}
+                onKeyUp={checkCommentMention}
+                onClick={checkCommentMention}
+                onKeyDown={e => {
+                  if (handleCommentMentionKeyDown(e)) return;
+                }}
+                placeholder="Add a comment…"
                 disabled={isSubmitting}
                 style={{
                   flex: 1, background: 'none', border: 'none', outline: 'none',
                   fontSize: '14.5px', color: 'var(--ink-900)', fontFamily: 'var(--font-sans)',
                 }}
+              />
+              <MentionDropdown
+                isOpen={isCommentMentionOpen}
+                suggestions={commentMentionSuggestions}
+                activeIndex={commentMentionActiveIndex}
+                isLoading={isCommentMentionLoading}
+                onSelect={selectCommentMentionUser}
+                style={{ bottom: '100%', left: 0, marginBottom: '8px' }}
               />
               <button
                 type="submit"
@@ -438,7 +514,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
                   transition: 'all 0.2s', whiteSpace: 'nowrap',
                 }}
               >
-                {isSubmitting ? 'â€¦' : 'Post'}
+                {isSubmitting ? '…' : 'Post'}
               </button>
             </div>
           </div>

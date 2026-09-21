@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Icon, Button } from '../ui';
+import { Icon, Button, useMentionAutocomplete, MentionDropdown } from '../ui';
+import { useConfig } from '../../contexts/ConfigContext';
 import api from '../../services/api';
 
 interface ComposeLetterProps {
@@ -13,13 +14,31 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
   placeholder = 'Write a letter, essay, or thought...',
   isStandalone = false,
 }) => {
+  const { features, settings } = useConfig();
+  const maxLen = settings.maxPostLength || 2000;
   const [content, setContent] = useState('');
+  const [allowReposts, setAllowReposts] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<{ file: File; previewUrl: string; isVideo: boolean }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const {
+    isOpen: isMentionOpen,
+    suggestions: mentionSuggestions,
+    activeIndex: mentionActiveIndex,
+    isLoading: isMentionLoading,
+    checkForMention,
+    handleKeyDown: handleMentionKeyDown,
+    selectUser: selectMentionUser,
+  } = useMentionAutocomplete(content, setContent, textareaRef);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!features.mediaUploads) {
+      setError('Manuscript media attachments are currently paused by platform administrators.');
+      return;
+    }
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
@@ -77,6 +96,11 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
     e.preventDefault();
     if (!content.trim() && selectedFiles.length === 0) return;
 
+    if (content.length > maxLen) {
+      setError(`Your letter exceeds the maximum prose limit of ${maxLen} characters.`);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError('');
@@ -110,9 +134,11 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
       await api.post('/content/posts', {
         content: content.trim(),
         mediaIds,
+        allowReposts,
       });
 
       setContent('');
+      setAllowReposts(false);
       clearAllFiles();
       onPostCreated?.();
     } catch (err: any) {
@@ -129,15 +155,35 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
     <form className={`wren-compose ${isStandalone ? 'standalone' : ''}`} onSubmit={handleSubmit} aria-label="Compose post" style={isStandalone ? { padding: 0, border: 'none', margin: 0 } : undefined}>
       {error && <div className="wren-error" role="alert" style={{ marginBottom: '12px' }}>{error}</div>}
 
-      <textarea
-        className="wren-compose-input"
-        placeholder={placeholder}
-        value={content}
-        onChange={e => setContent(e.target.value)}
-        rows={isStandalone ? 8 : 2}
-        style={isStandalone ? { minHeight: '300px', fontSize: '18px', padding: '24px', backgroundColor: 'transparent', border: 'none', boxShadow: 'none' } : undefined}
-        aria-label="Write a letter or post"
-      />
+      <div style={{ position: 'relative' }}>
+        <textarea
+          ref={textareaRef}
+          className="wren-compose-input"
+          placeholder={placeholder}
+          value={content}
+          onChange={e => {
+            setContent(e.target.value);
+            checkForMention();
+          }}
+          onKeyUp={checkForMention}
+          onClick={checkForMention}
+          onKeyDown={e => {
+            if (handleMentionKeyDown(e)) return;
+          }}
+          rows={isStandalone ? 8 : 2}
+          style={isStandalone ? { minHeight: '300px', fontSize: '18px', padding: '24px', backgroundColor: 'transparent', border: 'none', boxShadow: 'none' } : undefined}
+          aria-label="Write a letter or post"
+        />
+
+        <MentionDropdown
+          isOpen={isMentionOpen}
+          suggestions={mentionSuggestions}
+          activeIndex={mentionActiveIndex}
+          isLoading={isMentionLoading}
+          onSelect={selectMentionUser}
+          style={{ top: '100%', left: 0 }}
+        />
+      </div>
 
       {/* Multiple Media attachment preview strip */}
       {selectedFiles.length > 0 && (
@@ -248,25 +294,87 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
 
       <div className="wren-compose-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept="image/*,video/*"
-            multiple
-            style={{ display: 'none' }}
-            id="wren-file-upload"
-          />
+          {features.mediaUploads ? (
+            <>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*,video/*"
+                multiple
+                style={{ display: 'none' }}
+                id="wren-file-upload"
+              />
+              <label
+                htmlFor="wren-file-upload"
+                className="wren-btn wren-btn-outline"
+                style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px' }}
+                title="Attach images or videos (up to 5)"
+                aria-label="Attach media"
+              >
+                <Icon name="image" size={16} />
+                <span style={{ fontSize: '13px', fontWeight: 500 }}>Photos & Videos</span>
+              </label>
+            </>
+          ) : (
+            <span
+              style={{
+                fontSize: '12px',
+                color: 'var(--ink-400)',
+                fontStyle: 'italic',
+                padding: '4px 8px',
+              }}
+              title="Media uploads are paused by administration"
+            >
+              Imagery disabled
+            </span>
+          )}
+
+          {/* Allow Reposts toggle checkbox */}
           <label
-            htmlFor="wren-file-upload"
-            className="wren-btn wren-btn-outline"
-            style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px' }}
-            title="Attach images or videos (up to 5)"
-            aria-label="Attach media"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              fontSize: '12.5px',
+              color: allowReposts ? 'var(--moss, #2e7d32)' : 'var(--ink-600, #57534E)',
+              userSelect: 'none',
+              fontFamily: 'var(--font-sans, sans-serif)',
+              fontWeight: allowReposts ? 600 : 500,
+              padding: '4px 8px',
+              borderRadius: '4px',
+              backgroundColor: allowReposts ? 'rgba(46, 125, 50, 0.08)' : 'transparent',
+              border: allowReposts ? '1px solid rgba(46, 125, 50, 0.25)' : '1px solid transparent',
+              transition: 'all 0.15s ease',
+              marginLeft: '4px',
+            }}
+            title="Allow other readers to repost this letter"
           >
-            <Icon name="image" size={16} />
-            <span style={{ fontSize: '13px', fontWeight: 500 }}>Photos & Videos</span>
+            <input
+              type="checkbox"
+              checked={allowReposts}
+              onChange={(e) => setAllowReposts(e.target.checked)}
+              style={{ cursor: 'pointer', accentColor: 'var(--moss, #2e7d32)' }}
+            />
+            <Icon name="repost" size={14} style={{ color: allowReposts ? 'var(--moss, #2e7d32)' : 'var(--ink-500)' }} />
+            <span>Allow Reposting</span>
           </label>
+
+          {/* Character counter */}
+          {content.length > 0 && (
+            <span
+              style={{
+                fontSize: '12px',
+                fontFamily: 'var(--font-sans)',
+                fontWeight: 500,
+                color: content.length > maxLen ? 'var(--rust-alert, #A63D40)' : 'var(--ink-400)',
+                marginLeft: '8px',
+              }}
+            >
+              {content.length}/{maxLen}
+            </span>
+          )}
         </div>
 
         {/* Send button fades in only when text exists (absent when empty) */}
@@ -274,7 +382,7 @@ export const ComposeLetter: React.FC<ComposeLetterProps> = ({
           <Button
             type="submit"
             variant="primary"
-            disabled={!hasContent || isSubmitting}
+            disabled={!hasContent || isSubmitting || content.length > maxLen}
             isLoading={isSubmitting}
             style={isStandalone ? { padding: '10px 24px', fontSize: '15px' } : undefined}
           >

@@ -9,6 +9,7 @@ interface InteractionBarProps {
   isSaved?: boolean;
   isReposted?: boolean;
   repostCount?: number;
+  allowReposts?: boolean;
   onLikeToggle?: () => void;
   onCommentClick?: () => void;
   onRepostClick?: () => void;
@@ -22,6 +23,7 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
   isSaved = false,
   isReposted = false,
   repostCount = 0,
+  allowReposts = false,
   onLikeToggle,
   onCommentClick,
   onRepostClick,
@@ -37,7 +39,10 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
   React.useEffect(() => {
     setLocalLiked(isLiked);
     setLocalLikeCount(likeCount);
-  }, [isLiked, likeCount]);
+    setLocalSaved(isSaved);
+    setLocalReposted(isReposted);
+    setLocalRepostCount(repostCount);
+  }, [isLiked, likeCount, isSaved, isReposted, repostCount]);
 
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -66,12 +71,12 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
   };
 
   return (
-    <div className="wren-interaction-bar" role="toolbar" aria-label="Post actions">
+    <div className="wren-interaction-bar post-actions" role="toolbar" aria-label="Post actions">
       {/* 1. Reply: hide '0' count when count === 0 */}
       <button
         type="button"
         onClick={onCommentClick}
-        className="wren-action-item reply-action"
+        className="wren-action-item reply-action comment-btn"
         title="Reply"
         aria-label={`Reply to post. ${commentCount > 0 ? `${commentCount} replies` : ''}`}
       >
@@ -79,23 +84,25 @@ export const InteractionBar: React.FC<InteractionBarProps> = ({
         {commentCount > 0 && <span className="type-ui-s">{commentCount}</span>}
       </button>
 
-      {/* 2. Repost: moss hover / active */}
-      <button
-        type="button"
-        onClick={handleRepost}
-        className={`wren-action-item repost-action ${localReposted ? 'is-active' : ''}`}
-        title={localReposted ? 'Undo repost' : 'Repost'}
-        aria-label={`Repost. ${localRepostCount > 0 ? `${localRepostCount} reposts` : ''}`}
-      >
-        <Icon name="repost" size={17} className="wren-action-icon" />
-        {localRepostCount > 0 && <span className="type-ui-s">{localRepostCount}</span>}
-      </button>
+      {/* 2. Repost: moss hover / active - only if author enabled reposting */}
+      {allowReposts && (
+        <button
+          type="button"
+          onClick={handleRepost}
+          className={`wren-action-item repost-action share-btn ${localReposted ? 'is-active' : ''}`}
+          title={localReposted ? 'Undo repost' : 'Repost'}
+          aria-label={`Repost. ${localRepostCount > 0 ? `${localRepostCount} reposts` : ''}`}
+        >
+          <Icon name="repost" size={17} className="wren-action-icon" />
+          {localRepostCount > 0 && <span className="type-ui-s">{localRepostCount}</span>}
+        </button>
+      )}
 
       {/* 3. Like: wine-700 active with 180ms ease-out scale */}
       <button
         type="button"
         onClick={handleLike}
-        className={`wren-action-item like-action ${localLiked ? 'is-active' : ''}`}
+        className={`wren-action-item like-action like-btn ${localLiked ? 'is-active' : ''}`}
         title={localLiked ? 'Unlike' : 'Like'}
         aria-label={`Like post. ${localLikeCount > 0 ? `${localLikeCount} likes` : ''}`}
       >

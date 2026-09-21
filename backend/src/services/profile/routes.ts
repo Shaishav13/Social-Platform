@@ -176,8 +176,12 @@ router.put('/', authenticateToken, async (req: Request, res: Response): Promise<
   } catch (error) {
     console.error('Error updating profile:', error);
     if (error instanceof Error) {
-      if (error.message.includes('validation failed') || error.message.includes('already taken')) {
-        res.status(400).json({ error: error.message });
+      if (
+        error.message.includes('validation failed') ||
+        error.message.includes('already taken') ||
+        error.message.includes('Date of birth can only be changed')
+      ) {
+        res.status(400).json({ error: error.message, message: error.message });
         return;
       }
     }

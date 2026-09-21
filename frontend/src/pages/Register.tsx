@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useConfig } from '../contexts/ConfigContext';
 import { Button, Icon } from '../components/ui';
 import api from '../services/api';
 
 type Step = 'username' | 'credentials' | 'verify' | 'age' | 'profile';
 
 const Register: React.FC = () => {
+  const { features, settings } = useConfig();
   const [step, setStep] = useState<Step>('username');
   
   // Form State
@@ -468,13 +470,33 @@ const Register: React.FC = () => {
     </form>
   );
 
+  if (!features.publicRegistration) {
+    return (
+      <div style={{ maxWidth: '440px', margin: '60px auto 0', padding: '0 16px' }}>
+        <div className="wren-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+          <div style={{ fontSize: '42px', marginBottom: '16px' }}>🔏</div>
+          <h1 className="type-display-m" style={{ marginBottom: '12px' }}>
+            Registration Paused
+          </h1>
+          <p className="type-ui-m" style={{ color: 'var(--ink-600)', lineHeight: 1.6, marginBottom: '24px' }}>
+            Public author registrations are temporarily paused on {settings.siteName || 'UdtaBirdie'} by platform administration.
+            Existing authors may sign in below.
+          </p>
+          <Link to="/login" className="wren-btn wren-btn-primary" style={{ width: '100%', display: 'inline-block' }}>
+            Go to Sign In
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: '440px', margin: '40px auto 0' }}>
       <div className="wren-card">
         <div style={{ marginBottom: '28px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-            <img src="/logo2.png" alt="UdtaBirdie" style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '4px' }} />
-            <span className="type-ui-s" style={{ letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--ink-600)', fontWeight: 600 }}>UdtaBirdie</span>
+            <img src="/logo2.png" alt={settings.siteName || 'UdtaBirdie'} style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '4px' }} />
+            <span className="type-ui-s" style={{ letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--ink-600)', fontWeight: 600 }}>{settings.siteName || 'UdtaBirdie'}</span>
           </div>
           <h1 className="type-display-m" style={{ marginBottom: '6px' }}>
             {step === 'username' && 'Create an Account'}

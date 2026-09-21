@@ -264,6 +264,16 @@ router.post('/register', registerLimiter, async (req: Request, res: Response) =>
       });
     }
 
+    // Check if public registration is enabled
+    const { AdminDatabase } = await import('../admin/database');
+    const features = await AdminDatabase.getFeatures();
+    if (!features.publicRegistration) {
+      return res.status(403).json({
+        success: false,
+        message: 'Public author registration is currently suspended by platform administrators.',
+      });
+    }
+
     const registerData: RegisterRequest = {
       username: sanitizeInput(value.username),
       email: sanitizeInput(value.email.toLowerCase()),

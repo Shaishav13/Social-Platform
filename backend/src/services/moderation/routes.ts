@@ -3,6 +3,7 @@ import { ModerationModels } from './models';
 import { CreateReportRequest, CreateBlockRequest, ReviewReportRequest } from './types';
 import { ContentValidationMiddleware, ContentRateLimiter, AutoModerationService } from './contentValidation';
 import { SpamDetectionService } from './spamDetection';
+import { authenticateToken } from '../auth/middleware';
 
 type AuthenticatedRequest = any;
 
@@ -20,11 +21,13 @@ export function createModerationRoutes(moderationModels: ModerationModels): Rout
   const autoModerationService = new AutoModerationService(moderationModels);
 
   // Report content endpoint
-  router.post('/report', async (req: AuthenticatedRequest, res: Response) => {
+  router.post('/report', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Authentication required' });
       }
+
+      const reporterId = req.user.userId || req.user.id;
 
       const reportRequest: CreateReportRequest = req.body;
       
@@ -41,7 +44,7 @@ export function createModerationRoutes(moderationModels: ModerationModels): Rout
         });
       }
 
-      const result = await moderationModels.createReport(req.user.id, reportRequest);
+      const result = await moderationModels.createReport(reporterId, reportRequest);
       
       if (result.status === 'duplicate') {
         return res.status(409).json(result);

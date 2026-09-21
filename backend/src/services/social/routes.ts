@@ -185,7 +185,17 @@ router.post('/posts/:id/comments', authenticateToken, async (req, res) => {
   try {
     const postId = req.params.id;
     const userId = (req as any).user.userId;
+    const userRole = (req as any).user?.role;
     const { content, parentId } = req.body;
+
+    const { AdminDatabase } = await import('../admin/database');
+    const features = await AdminDatabase.getFeatures();
+    if (!features.commenting && userRole !== 'admin') {
+      return res.status(403).json({
+        error: 'Commenting disabled',
+        message: 'Dialogue replies and comments are currently frozen by platform administrators.'
+      });
+    }
 
     // Validate request
     const validation = CommentModel.validateCommentRequest(postId, { content, parentId });
@@ -278,6 +288,20 @@ router.post('/posts/:id/share', authenticateToken, async (req, res) => {
       data: result
     });
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'REPOST_NOT_ALLOWED') {
+        return res.status(403).json({
+          error: 'Forbidden',
+          message: 'The author has not enabled reposting for this letter.'
+        });
+      }
+      if (error.message === 'POST_NOT_FOUND') {
+        return res.status(404).json({
+          error: 'Not Found',
+          message: 'Letter not found.'
+        });
+      }
+    }
     console.error('Error sharing post:', error);
     res.status(500).json({
       error: 'Internal server error',
@@ -312,6 +336,16 @@ router.post('/users/:id/follow', authenticateToken, async (req, res) => {
   try {
     const targetId = req.params.id;
     const requesterId = (req as any).user.userId;
+    const userRole = (req as any).user?.role;
+
+    const { AdminDatabase } = await import('../admin/database');
+    const features = await AdminDatabase.getFeatures();
+    if (!features.followRequests && userRole !== 'admin') {
+      return res.status(403).json({
+        error: 'Follows suspended',
+        message: 'Author subscriptions and follow requests are currently suspended by platform administrators.'
+      });
+    }
 
     // Validate request
     const validation = FollowModel.validateFollowRequest(requesterId, targetId);

@@ -376,6 +376,21 @@ export class SocialDatabase {
     }
   }
 
+  static async deleteShare(userId: string, postId: string): Promise<boolean> {
+    const client = await DatabaseConnection.getClient();
+    
+    try {
+      const result = await client.query(
+        'DELETE FROM shares WHERE user_id = $1 AND post_id = $2',
+        [userId, postId]
+      );
+
+      return ((result as any).rowCount ?? 0) > 0;
+    } finally {
+      client.release();
+    }
+  }
+
   static async getShareCount(postId: string): Promise<number> {
     const client = await DatabaseConnection.getClient();
     

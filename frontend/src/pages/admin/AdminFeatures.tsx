@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { useConfig } from '../../contexts/ConfigContext';
 import type { PlatformFeatures } from '../../types';
 
 export const AdminFeatures: React.FC = () => {
+  const { refreshConfig } = useConfig();
   const [features, setFeatures] = useState<PlatformFeatures>({
     publicRegistration: true,
     mediaUploads: true,
@@ -48,6 +50,7 @@ export const AdminFeatures: React.FC = () => {
       if (res.data?.data) {
         setFeatures(res.data.data);
       }
+      await refreshConfig();
       setSuccessMsg('Feature flags successfully persisted.');
       setTimeout(() => setSuccessMsg(null), 3500);
     } catch (err: any) {

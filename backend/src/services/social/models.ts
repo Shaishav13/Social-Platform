@@ -1,5 +1,6 @@
 import { Like, Comment, Share, CommentWithReplies, CreateCommentRequest, LikeResponse, ShareResponse, FollowResponse, FollowRequest } from './types';
 import { SocialDatabase } from './database';
+import { ContentDatabase } from '../content/database';
 import { ProfileModel } from '../profile/models';
 
 export class LikeModel {
@@ -151,13 +152,24 @@ export class CommentModel {
 
 export class ShareModel {
   static async sharePost(userId: string, postId: string): Promise<ShareResponse> {
+    // Check if post exists and allows reposts
+    const post = await ContentDatabase.getPostById(postId);
+    if (!post) {
+      throw new Error('POST_NOT_FOUND');
+    }
+    if (!post.allowReposts) {
+      throw new Error('REPOST_NOT_ALLOWED');
+    }
+
     // Check if already shared
     const existingShare = await SocialDatabase.findShare(userId, postId);
     
     if (existingShare) {
-      // Already shared, return current status
+      // Toggle off / Un-repost
+      await SocialDatabase.deleteShare(userId, postId);
+      await SocialDatabase.updatePostShareCount(postId, false);
       const shareCount = await SocialDatabase.getShareCount(postId);
-      return { shared: true, shareCount };
+      return { shared: false, shareCount };
     }
 
     // Create new share

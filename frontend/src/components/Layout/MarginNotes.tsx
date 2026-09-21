@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
+import { useConfig } from '../../contexts/ConfigContext';
 import type { Post } from '../../types';
 
 export const MarginNotes: React.FC = () => {
+  const { features, settings } = useConfig();
   const [trendingPosts, setTrendingPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    loadMarginContext();
-  }, []);
+    if (features.trendingFeed) {
+      loadMarginContext();
+    }
+  }, [features.trendingFeed]);
 
   const loadMarginContext = async () => {
     try {
@@ -34,33 +38,35 @@ export const MarginNotes: React.FC = () => {
         </p>
       </div>
 
-      <div className="wren-margin-section">
-        <div className="wren-margin-label">Trending Threads</div>
-        {isLoading ? (
-          <div className="type-ui-m" style={{ color: 'var(--ink-300)' }}>
-            Listening...
-          </div>
-        ) : trendingPosts.length > 0 ? (
-          trendingPosts.map(post => {
-            const title = post.content ? post.content.slice(0, 70) : 'Untitled letter';
-            return (
-              <div key={post.id} className="wren-margin-thread">
-                <Link to={`/post/${post.id}`} className="wren-margin-thread-title">
-                  {title}...
-                </Link>
-                <div className="wren-margin-thread-meta">
-                  {post.author?.username ? `@${post.author.username}` : 'Anonymous'} ·{' '}
-                  {post.likeCount || 0} likes · {post.commentCount || 0} replies
+      {features.trendingFeed && (
+        <div className="wren-margin-section">
+          <div className="wren-margin-label">Trending Threads</div>
+          {isLoading ? (
+            <div className="type-ui-m" style={{ color: 'var(--ink-300)' }}>
+              Listening...
+            </div>
+          ) : trendingPosts.length > 0 ? (
+            trendingPosts.map(post => {
+              const title = post.content ? post.content.slice(0, 70) : 'Untitled letter';
+              return (
+                <div key={post.id} className="wren-margin-thread">
+                  <Link to={`/post/${post.id}`} className="wren-margin-thread-title">
+                    {title}...
+                  </Link>
+                  <div className="wren-margin-thread-meta">
+                    {post.author?.username ? `@${post.author.username}` : 'Anonymous'} ·{' '}
+                    {post.likeCount || 0} likes · {post.commentCount || 0} replies
+                  </div>
                 </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="type-ui-m" style={{ color: 'var(--ink-300)' }}>
-            No recent active threads.
-          </div>
-        )}
-      </div>
+              );
+            })
+          ) : (
+            <div className="type-ui-m" style={{ color: 'var(--ink-300)' }}>
+              No recent active threads.
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="wren-margin-section">
         <div className="wren-margin-label">Navigation Footnote</div>
@@ -69,7 +75,7 @@ export const MarginNotes: React.FC = () => {
             Discover letters & thinkers →
           </Link>
           <span style={{ color: 'var(--ink-300)' }}>
-            UdtaBirdie · Wren Editorial Engine
+            {settings.siteName || 'UdtaBirdie'} · Editorial Engine
           </span>
         </div>
       </div>

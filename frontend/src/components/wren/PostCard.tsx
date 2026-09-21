@@ -31,6 +31,10 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [isLiked, setIsLiked] = useState(post.isLiked || false);
   const [likeCount, setLikeCount] = useState(post.likeCount || 0);
   const [isSaved, setIsSaved] = useState(Boolean(post.isSaved));
+  const [isReposted, setIsReposted] = useState(Boolean(post.isReposted));
+  const [repostCount, setRepostCount] = useState(post.shareCount || 0);
+  const [allowReposts, setAllowReposts] = useState(Boolean(post.allowReposts));
+  const [editAllowReposts, setEditAllowReposts] = useState(Boolean(post.allowReposts));
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -48,11 +52,18 @@ export const PostCard: React.FC<PostCardProps> = ({
     if (post.author?.username) {
       setAuthor(post.author);
     } else if (post.authorId) {
-      api.get(`/profile/${post.authorId}`).then(res => {
-        if (res.data) {
-          setAuthor(res.data);
+      try {
+        const req = api.get?.(`/profile/${post.authorId}`);
+        if (req && typeof req.then === 'function') {
+          req.then(res => {
+            if (res?.data) {
+              setAuthor(res.data);
+            }
+          }).catch(() => {});
         }
-      }).catch(() => {});
+      } catch {
+        // Safe ignore
+      }
     }
   }, [post.author, post.authorId]);
 
@@ -60,7 +71,11 @@ export const PostCard: React.FC<PostCardProps> = ({
     if (post.isSaved !== undefined) {
       setIsSaved(Boolean(post.isSaved));
     }
-  }, [post.isSaved]);
+    setIsReposted(Boolean(post.isReposted));
+    setRepostCount(post.shareCount || 0);
+    setAllowReposts(Boolean(post.allowReposts));
+    setEditAllowReposts(Boolean(post.allowReposts));
+  }, [post.isSaved, post.isReposted, post.shareCount, post.allowReposts]);
 
   const { user: authUser } = useAuth();
   const effectiveUser = currentUser || authUser;
@@ -152,11 +167,52 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   const handleSaveEdit = async () => {
     try {
-      await api.put(`/content/posts/${post.id}`, { content: editContent.trim() });
+      const trimmed = editContent.trim();
+      const payload: Record<string, unknown> = { allowReposts: editAllowReposts };
+      // Only send content when it's non-empty — image-only posts have no text
+      if (trimmed.length > 0) {
+        payload.content = trimmed;
+      }
+      await api.put(`/content/posts/${post.id}`, payload);
       setIsEditing(false);
-      (onPostUpdate || onUpdate)?.({ ...post, content: editContent.trim() });
+      setAllowReposts(editAllowReposts);
+      (onPostUpdate || onUpdate)?.({
+        ...post,
+        content: trimmed || post.content,
+        allowReposts: editAllowReposts
+      });
     } catch {
       alert('Failed to update letter.');
+    }
+  };
+
+  const handleRepostToggle = async () => {
+    if (!effectiveUser) {
+      navigate('/login');
+      return;
+    }
+    const prev = isReposted;
+    const next = !prev;
+    setIsReposted(next);
+    setRepostCount(c => (next ? c + 1 : Math.max(0, c - 1)));
+
+    try {
+      const res = await api.post(`/social/posts/${post.id}/share`);
+      if (res.data?.data) {
+        setIsReposted(res.data.data.shared);
+        setRepostCount(res.data.data.shareCount);
+        (onPostUpdate || onUpdate)?.({
+          ...post,
+          isReposted: res.data.data.shared,
+          shareCount: res.data.data.shareCount
+        });
+      }
+    } catch (err: any) {
+      console.error('Failed to toggle repost:', err);
+      setIsReposted(prev);
+      setRepostCount(c => (prev ? c + 1 : Math.max(0, c - 1)));
+      const msg = err.response?.data?.message || 'Failed to repost this letter.';
+      alert(msg);
     }
   };
 
@@ -182,9 +238,43 @@ export const PostCard: React.FC<PostCardProps> = ({
   const mediaUrls = post.mediaUrls || [];
 
   return (
-    <article className="wren-post" aria-labelledby={`post-author-${post.id}`}>
+    <article className="wren-post post-card" aria-labelledby={`post-author-${post.id}`}>
+      {/* Repost Header: Rendered when this item is a repost from another user */}
+      {post.repostedBy && (
+        <div
+          className="wren-repost-header"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12.5px',
+            color: 'var(--ink-500, #8A8580)',
+            marginBottom: '8px',
+            paddingLeft: '2px',
+            fontWeight: 500,
+            fontFamily: 'var(--font-sans, sans-serif)',
+          }}
+        >
+          <Icon name="repost" size={14} style={{ color: 'var(--moss, #2e7d32)' }} />
+          <span>
+            Reposted by{' '}
+            <Link
+              to={`/profile/${post.repostedBy.id || post.repostedBy.username}`}
+              style={{
+                color: 'var(--ink-800, #2C2825)',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              @{post.repostedBy.username}
+            </Link>
+          </span>
+        </div>
+      )}
+
       {/* Post Header: Author and metadata */}
-      <div className="wren-post-header">
+      <div className="wren-post-header post-header">
         <div className="wren-author-info">
           <Link to={`/profile/${post.authorId || author?.id || author?.username}`}>
             {author?.profilePicture && !imgError ? (
@@ -352,23 +442,49 @@ export const PostCard: React.FC<PostCardProps> = ({
             onChange={e => setEditContent(e.target.value)}
             rows={3}
           />
-          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+          <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+            <label style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              color: 'var(--ink-700, #44403C)',
+              cursor: 'pointer',
+              userSelect: 'none',
+              fontFamily: 'var(--font-sans, sans-serif)',
+            }}>
+              <input
+                type="checkbox"
+                checked={editAllowReposts}
+                onChange={e => setEditAllowReposts(e.target.checked)}
+                style={{ cursor: 'pointer', accentColor: 'var(--wine-700, #8b2438)' }}
+              />
+              <span>Allow others to repost this letter</span>
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
             <button onClick={handleSaveEdit} className="wren-btn wren-btn-primary" style={{ padding: '4px 12px', fontSize: '13px' }}>
               Save
             </button>
-            <button onClick={() => setIsEditing(false)} className="wren-btn wren-btn-secondary" style={{ padding: '4px 12px', fontSize: '13px' }}>
+            <button onClick={() => { setIsEditing(false); setEditAllowReposts(allowReposts); }} className="wren-btn wren-btn-secondary" style={{ padding: '4px 12px', fontSize: '13px' }}>
               Cancel
             </button>
           </div>
         </div>
       ) : (
-        <div className="wren-post-body">
+        <div className="wren-post-body post-content">
           {isDetailView ? (
             <p><RichText text={post.content} /></p>
           ) : (
-            <Link to={`/post/${post.id}`} style={{ display: 'block', color: 'inherit' }}>
+            <div
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('a')) return;
+                window.location.href = `/post/${post.id}`;
+              }}
+              style={{ cursor: 'pointer', color: 'inherit' }}
+            >
               <p><RichText text={post.content} /></p>
-            </Link>
+            </div>
           )}
         </div>
       )}
@@ -420,6 +536,9 @@ export const PostCard: React.FC<PostCardProps> = ({
           {/* Carousel Arrows */}
           {mediaUrls.length > 1 && currentMediaIndex > 0 && (
             <button
+              type="button"
+              aria-label="Previous attachment"
+              title="Previous attachment"
               onClick={(e) => { e.stopPropagation(); setCurrentMediaIndex(prev => prev - 1); }}
               style={{
                 position: 'absolute',
@@ -447,6 +566,9 @@ export const PostCard: React.FC<PostCardProps> = ({
 
           {mediaUrls.length > 1 && currentMediaIndex < mediaUrls.length - 1 && (
             <button
+              type="button"
+              aria-label="Next attachment"
+              title="Next attachment"
               onClick={(e) => { e.stopPropagation(); setCurrentMediaIndex(prev => prev + 1); }}
               style={{
                 position: 'absolute',
@@ -499,7 +621,11 @@ export const PostCard: React.FC<PostCardProps> = ({
         commentCount={post.commentCount || 0}
         isLiked={isLiked}
         isSaved={isSaved}
+        isReposted={isReposted}
+        repostCount={repostCount}
+        allowReposts={allowReposts}
         onLikeToggle={handleLikeToggle}
+        onRepostClick={handleRepostToggle}
         onSaveClick={handleSaveToggle}
         onCommentClick={() => {
           if (!isDetailView) {

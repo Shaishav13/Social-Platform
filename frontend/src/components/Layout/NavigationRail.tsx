@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useConfig } from '../../contexts/ConfigContext';
 import { Icon, Badge } from '../ui';
 import api from '../../services/api';
 
 export const NavigationRail: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const { theme, density, toggleTheme, toggleDensity } = useTheme();
+  const { settings } = useConfig();
   const location = useLocation();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -95,10 +97,10 @@ export const NavigationRail: React.FC = () => {
         {!isExpanded ? (
           <>
             {/* Collapsed Logo */}
-            <NavLink to="/" className="wren-rail-brand" title="UdtaBirdie" aria-label="UdtaBirdie Home">
+            <NavLink to="/" className="wren-rail-brand" title={settings.siteName || 'UdtaBirdie'} aria-label={`${settings.siteName || 'UdtaBirdie'} Home`}>
               <img
                 src="/logo2.png"
-                alt="UdtaBirdie"
+                alt={settings.siteName || 'UdtaBirdie'}
                 style={{ width: '32px', height: '32px', objectFit: 'contain', borderRadius: '4px' }}
               />
             </NavLink>
@@ -182,7 +184,7 @@ export const NavigationRail: React.FC = () => {
               <NavLink to="/" className="wren-rail-brand-expanded">
                 <img
                   src="/logo2.png"
-                  alt="UdtaBirdie"
+                  alt={settings.siteName || 'UdtaBirdie'}
                   style={{ width: '34px', height: '34px', objectFit: 'contain', borderRadius: '4px', flexShrink: 0 }}
                 />
                 <div className="wren-rail-brand-text">
@@ -190,7 +192,7 @@ export const NavigationRail: React.FC = () => {
                     className="type-display-m"
                     style={{ fontSize: '1.1rem', fontWeight: 600, lineHeight: 1.1, color: 'var(--ink-900)' }}
                   >
-                    UdtaBirdie
+                    {settings.siteName || 'UdtaBirdie'}
                   </span>
                   <span
                     className="type-meta"

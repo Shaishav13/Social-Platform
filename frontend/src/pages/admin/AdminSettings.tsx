@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { useConfig } from '../../contexts/ConfigContext';
 import type { PlatformSettings } from '../../types';
 
 export const AdminSettings: React.FC = () => {
+  const { refreshConfig } = useConfig();
   const [settings, setSettings] = useState<PlatformSettings>({
     siteName: 'UdtaBirdie',
     announcementBanner: '',
@@ -44,6 +46,7 @@ export const AdminSettings: React.FC = () => {
       if (res.data?.data) {
         setSettings(res.data.data);
       }
+      await refreshConfig();
       setSuccessMsg('Platform settings saved successfully.');
       setTimeout(() => setSuccessMsg(null), 3500);
     } catch (err: any) {

@@ -33,6 +33,7 @@ import { SocialDatabase } from './services/social/database';
 import { ProfileDatabase } from './services/profile/database';
 import { BlogDatabase } from './services/blog/database';
 import { NotificationDatabase } from './services/notification/database';
+import { AdminDatabase } from './services/admin/database';
 import { notificationWebSocketService } from './services/notification/websocket';
 import { fileStorageService } from './services/content/storage';
 import { SearchService } from './services/search';
@@ -363,15 +364,67 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Maintenance mode check
-app.use((req, res, next) => {
-  if (config.get('features.maintenanceMode') && !req.path.startsWith('/health')) {
-    return res.status(503).json({
-      success: false,
-      message: 'Service temporarily unavailable for maintenance',
-      retryAfter: 3600 // 1 hour
+// Public platform configuration endpoint (returns dynamic settings and features)
+app.get(`${API_PREFIX}/config`, async (_req, res) => {
+  try {
+    const [features, settings] = await Promise.all([
+      AdminDatabase.getFeatures(),
+      AdminDatabase.getSettings()
+    ]);
+    res.json({
+      success: true,
+      features,
+      settings: {
+        siteName: settings.siteName || 'UdtaBirdie',
+        announcementBanner: settings.announcementBanner || '',
+        defaultDensity: settings.defaultDensity || 'comfortable',
+        maxPostLength: settings.maxPostLength || 2000,
+      }
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Failed to retrieve configuration' });
   }
+});
+
+// Dynamic Maintenance mode check
+app.use(async (req, res, next) => {
+  if (
+    req.path.startsWith('/health') ||
+    req.path.startsWith('/favicon.ico') ||
+    req.path === `${API_PREFIX}/config` ||
+    req.path === `${API_PREFIX}/auth/login` ||
+    req.path.startsWith('/uploads')
+  ) {
+    return next();
+  }
+
+  try {
+    const features = await AdminDatabase.getFeatures();
+    if (features.maintenanceMode) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production-development-only'
+          );
+          if (decoded && (decoded.role === 'admin' || decoded.role === 'moderator')) {
+            return next();
+          }
+        } catch (_) {}
+      }
+
+      return res.status(503).json({
+        success: false,
+        maintenance: true,
+        message: 'Platform is currently undergoing scheduled maintenance. Please check back shortly.',
+        retryAfter: 1800
+      });
+    }
+  } catch (_) {}
+
   return next();
 });
 
@@ -442,6 +495,9 @@ async function startServer(): Promise<void> {
 
     await NotificationDatabase.createTables();
     console.log('✅ Notification tables initialized');
+
+    await AdminDatabase.initializeTables();
+    console.log('✅ Admin platform tables initialized');
 
     // Initialize performance monitoring after all tables are created
     DatabaseOptimizer.initialize();

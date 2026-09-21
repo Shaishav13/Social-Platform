@@ -8,6 +8,7 @@ export interface Post {
   commentCount: number;
   shareCount: number;
   isPublic: boolean;
+  allowReposts?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,16 +28,25 @@ export interface CreatePostRequest {
   content: string;
   mediaIds?: string[];
   isPublic?: boolean;
+  allowReposts?: boolean;
 }
 
 export interface UpdatePostRequest {
   content?: string;
   isPublic?: boolean;
+  allowReposts?: boolean;
 }
 
 export interface PostWithMedia extends Post {
   media: MediaFile[];
   isLiked?: boolean;
+  isSaved?: boolean;
+  isReposted?: boolean;
+  repostedBy?: {
+    id: string;
+    username: string;
+    profilePicture?: string;
+  } | null;
   author?: {
     id: string;
     username: string;

@@ -213,7 +213,7 @@ describe('UI Consistency Properties', () => {
             const hasAriaLabel = button.getAttribute('aria-label');
             const hasTitle = button.getAttribute('title');
             
-            expect(hasText || hasAriaLabel || hasTitle).toBe(true);
+            expect(Boolean(hasText || hasAriaLabel || hasTitle)).toBe(true);
           });
         }),
         { numRuns: 3 }

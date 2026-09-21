@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useConfig } from '../../contexts/ConfigContext';
 import { Icon } from '../ui';
 
 export const QuietTopBar: React.FC = () => {
   const { theme, toggleTheme, toggleDensity } = useTheme();
+  const { settings } = useConfig();
 
   return (
     <header className="wren-mobile-top" role="banner">
@@ -20,11 +22,11 @@ export const QuietTopBar: React.FC = () => {
       >
         <img
           src="/logo2.png"
-          alt="UdtaBirdie"
+          alt={settings.siteName || 'UdtaBirdie'}
           style={{ width: '24px', height: '24px', objectFit: 'contain', borderRadius: '3px' }}
         />
         <span className="type-display-m" style={{ fontSize: '18px', fontWeight: 600 }}>
-          UdtaBirdie
+          {settings.siteName || 'UdtaBirdie'}
         </span>
       </Link>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

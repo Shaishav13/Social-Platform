@@ -89,9 +89,9 @@ const Feed: React.FC = () => {
         <SkeletonLoader count={3} />
       ) : posts.length > 0 ? (
         <div className="wren-posts-flow">
-          {posts.map(post => (
+          {posts.map((post, idx) => (
             <PostCard
-              key={post.id}
+              key={post.repostedBy ? `${post.id}-repost-${post.repostedBy.id}-${idx}` : `${post.id}-${idx}`}
               post={post}
               currentUser={user || undefined}
               onPostUpdate={handlePostUpdate}

@@ -4,6 +4,28 @@ import { SearchQuery, FeedOptions } from './types';
 
 const router = express.Router();
 
+// GET /search/users - User suggestions / tagging autocomplete
+router.get('/users', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const query = (req.query.q as string) || '';
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 20);
+
+    const userResults = await SearchModel.searchUsers(query, 1, limit);
+    res.json({
+      users: (userResults.results || []).map((u: any) => ({
+        id: u.id,
+        username: u.username,
+        bio: u.bio,
+        profilePicture: u.profilePicture,
+        isVerified: u.isVerified || false
+      }))
+    });
+  } catch (error) {
+    console.error('Error searching users for mention autocomplete:', error);
+    res.status(500).json({ error: 'Failed to search users' });
+  }
+});
+
 // GET /search - Universal search endpoint
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
