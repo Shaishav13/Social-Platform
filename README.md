@@ -108,20 +108,6 @@ A modern, Instagram-inspired social media platform built with React, TypeScript,
 - **Nginx** - Reverse proxy and static file serving
 - **Redis** - Session storage and caching
 
-## Documentation
-
-All comprehensive architectural and operational guides are organized in the [`docs/`](docs/) directory:
-
-| Document | Description |
-| :--- | :--- |
-| [ Production Deployment Guide](docs/DEPLOYMENT_GUIDE.md) | Complete 100% free production deployment guide (Vercel, Render, Neon, Upstash) |
-| [ API Reference](docs/API.md) | Microservices API endpoint catalog and request/response specifications |
-| [ Development Guide](docs/DEVELOPMENT.md) | Local environment setup, environment variables, and dev workflows |
-| [ Frontend Guide](docs/FRONTEND.md) | Frontend architecture, state management, and Wren design system |
-| [ Security Audit Report](docs/SECURITY_AUDIT_REPORT.md) | Comprehensive security assessment and vulnerability remediations |
-| [ Contributing Guidelines](docs/CONTRIBUTING.md) | Code standards, branching, and pull request guidelines |
-| [ Roadmap & Tasks](docs/TODO.md) | Project roadmap, future milestones, and feature backlog |
-
 ## Installation
 
 ### Prerequisites
