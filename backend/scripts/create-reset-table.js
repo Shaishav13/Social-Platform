@@ -1,8 +1,11 @@
+require('dotenv').config({ path: '../.env' }); // or whichever path .env is in
 const { Pool } = require('pg');
 const pool = new Pool({
-  host: 'localhost', port: 5432,
-  database: 'social_media_platform',
-  user: 'postgres', password: 'shaishau'
+  host: process.env.DB_HOST || 'localhost', 
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME || 'social_media_platform',
+  user: process.env.DB_USER || 'postgres', 
+  password: process.env.DB_PASSWORD
 });
 
 async function run() {
