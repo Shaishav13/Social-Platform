@@ -1,4 +1,45 @@
-# 🐦 Social Platform
+# Social Platform
+
+[Live Demo](https://social-platform-murex.vercel.app)
+
+## Features
+- **Real-time Feed**: Instantly see new posts and interactions using WebSockets.
+- **Redis Caching**: High performance and reduced database load for feeds and sessions.
+- **User Authentication**: Secure JWT-based login and registration.
+- **Social Interactions**: Follow users, like posts, and leave comments.
+- **Media Uploads**: Support for image and video uploads.
+
+## How to run locally
+
+### Step 1: Clone & Install Dependencies
+```bash
+git clone https://github.com/Shaishav13/social-platform.git
+cd social-platform
+cd backend && npm install && cd ..
+cd frontend && npm install && cd ..
+```
+
+### Step 2: Database & Env Setup
+```bash
+# Setup Postgres DB
+createdb social_media_platform
+psql -d social_media_platform -f backend/scripts/init-db.sql
+
+# Set up environment variables
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+### Step 3: Run the servers
+```bash
+# Start backend (from root)
+npm run dev:backend
+
+# Start frontend (in another terminal)
+npm run dev:frontend
+```
+
+# Social Platform
 
 A modern, Instagram-inspired social media platform built with React, TypeScript, Node.js, and PostgreSQL. Features real-time interactions, media sharing, and a professional, responsive UI.
 
@@ -8,15 +49,15 @@ A modern, Instagram-inspired social media platform built with React, TypeScript,
 ![Node.js](https://img.shields.io/badge/Node.js-43853D?logo=node.js&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?logo=postgresql&logoColor=white)
 
-## ✨ Features
+## Features
 
-### 🔐 Authentication & User Management
+### Authentication & User Management
 - **Secure Authentication**: JWT-based authentication with refresh tokens
 - **User Registration & Login**: Complete user onboarding flow
 - **Profile Management**: Edit profile, upload profile pictures, manage privacy settings
 - **Account Deletion**: Complete data removal with password confirmation
 
-### 📱 Social Features
+### Social Features
 - **Posts**: Create, edit, and delete posts with text and media
 - **Media Support**: Upload and share images and videos
 - **Interactions**: Like, comment, and share posts
@@ -24,26 +65,26 @@ A modern, Instagram-inspired social media platform built with React, TypeScript,
 - **Follow System**: Follow/unfollow users, view followers and following
 - **Comments**: Nested comment system with reply functionality
 
-### 🔍 Discovery & Exploration
+### Discovery & Exploration
 - **Explore Page**: Discover trending posts and suggested users
 - **Search**: Find users and posts with advanced search functionality
 - **Trending Posts**: Algorithm-based trending content discovery
 - **User Suggestions**: Smart user recommendations
 
-### 🎨 Modern UI/UX
+### Modern UI/UX
 - **Instagram-Inspired Design**: Clean, professional interface
 - **Responsive Layout**: Optimized for desktop, tablet, and mobile
 - **Professional Typography**: Clean, readable font system
 - **Smooth Animations**: Polished user interactions
 
-### 🛡️ Security & Performance
+### Security & Performance
 - **Rate Limiting**: API protection against abuse
 - **Input Sanitization**: XSS and injection protection
 - **CORS Configuration**: Secure cross-origin requests
 - **Performance Monitoring**: Built-in metrics and monitoring
 - **Database Optimization**: Efficient queries and indexing
 
-## 🚀 Tech Stack
+## Tech Stack
 
 ### Frontend
 - **React 18** - Modern React with hooks and context
@@ -67,21 +108,21 @@ A modern, Instagram-inspired social media platform built with React, TypeScript,
 - **Nginx** - Reverse proxy and static file serving
 - **Redis** - Session storage and caching
 
-## 📚 Documentation
+## Documentation
 
 All comprehensive architectural and operational guides are organized in the [`docs/`](docs/) directory:
 
 | Document | Description |
 | :--- | :--- |
-| [🚀 Production Deployment Guide](docs/DEPLOYMENT_GUIDE.md) | Complete 100% free production deployment guide (Vercel, Render, Neon, Upstash) |
-| [📡 API Reference](docs/API.md) | Microservices API endpoint catalog and request/response specifications |
-| [💻 Development Guide](docs/DEVELOPMENT.md) | Local environment setup, environment variables, and dev workflows |
-| [🎨 Frontend Guide](docs/FRONTEND.md) | Frontend architecture, state management, and Wren design system |
-| [🛡️ Security Audit Report](docs/SECURITY_AUDIT_REPORT.md) | Comprehensive security assessment and vulnerability remediations |
-| [🤝 Contributing Guidelines](docs/CONTRIBUTING.md) | Code standards, branching, and pull request guidelines |
-| [📋 Roadmap & Tasks](docs/TODO.md) | Project roadmap, future milestones, and feature backlog |
+| [ Production Deployment Guide](docs/DEPLOYMENT_GUIDE.md) | Complete 100% free production deployment guide (Vercel, Render, Neon, Upstash) |
+| [ API Reference](docs/API.md) | Microservices API endpoint catalog and request/response specifications |
+| [ Development Guide](docs/DEVELOPMENT.md) | Local environment setup, environment variables, and dev workflows |
+| [ Frontend Guide](docs/FRONTEND.md) | Frontend architecture, state management, and Wren design system |
+| [ Security Audit Report](docs/SECURITY_AUDIT_REPORT.md) | Comprehensive security assessment and vulnerability remediations |
+| [ Contributing Guidelines](docs/CONTRIBUTING.md) | Code standards, branching, and pull request guidelines |
+| [ Roadmap & Tasks](docs/TODO.md) | Project roadmap, future milestones, and feature backlog |
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 - Node.js 18+ 
@@ -135,7 +176,7 @@ The application will be available at:
 - Frontend: http://localhost:3001
 - Backend API: http://localhost:3003
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -175,58 +216,58 @@ VITE_API_URL=http://localhost:3003/api/v1
 VITE_APP_NAME=UdtaBirdie
 ```
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 social-platform/
-├── 📁 config/                   # Configuration files
+├──  config/                   # Configuration files
 │   ├── .env.example            # Environment template
 │   ├── .env.production         # Production environment
 │   ├── .eslintrc.js           # ESLint configuration
 │   ├── jest.config.js         # Jest configuration
 │   └── tsconfig.json          # TypeScript configuration
-├── 📁 deployment/              # Deployment files
+├──  deployment/              # Deployment files
 │   ├── docker-compose.yml     # Docker composition
 │   ├── Dockerfile             # Docker image definition
 │   └── nginx.conf             # Nginx configuration
-├── 📁 docs/                    # Documentation
+├──  docs/                    # Documentation
 │   ├── API.md                 # API documentation
 │   ├── CONTRIBUTING.md        # Contribution guidelines
 │   ├── DEPLOYMENT.md          # Deployment guide
 │   ├── DEVELOPMENT.md         # Development setup
 │   └── LICENSE                # MIT License
-├── 📁 frontend/                # React frontend application
-│   ├── 📁 src/
-│   │   ├── 📁 components/     # Reusable UI components
-│   │   ├── 📁 pages/          # Page components
-│   │   ├── 📁 contexts/       # React contexts
-│   │   ├── 📁 services/       # API services
-│   │   ├── 📁 types/          # TypeScript type definitions
-│   │   └── 📁 utils/          # Utility functions
-│   └── 📁 public/             # Static assets
-├── 📁 scripts/                # Database and utility scripts
+├──  frontend/                # React frontend application
+│   ├──  src/
+│   │   ├──  components/     # Reusable UI components
+│   │   ├──  pages/          # Page components
+│   │   ├──  contexts/       # React contexts
+│   │   ├──  services/       # API services
+│   │   ├──  types/          # TypeScript type definitions
+│   │   └──  utils/          # Utility functions
+│   └──  public/             # Static assets
+├──  scripts/                # Database and utility scripts
 │   ├── init-db.sql           # Database initialization
 │   ├── setup-db.sql          # Additional setup
 │   └── deploy.sh             # Deployment script
-├── 📁 src/                    # Backend source code
-│   ├── 📁 services/           # Microservices
-│   │   ├── 📁 auth/          # Authentication service
-│   │   ├── 📁 content/       # Content management
-│   │   ├── 📁 social/        # Social interactions
-│   │   ├── 📁 profile/       # User profiles
-│   │   ├── 📁 blog/          # Blog functionality
-│   │   ├── 📁 notification/  # Notifications
-│   │   ├── 📁 search/        # Search functionality
-│   │   └── 📁 moderation/    # Content moderation
-│   ├── 📁 middleware/         # Express middleware
-│   ├── 📁 config/            # Configuration files
-│   ├── 📁 utils/             # Utility functions
-│   └── 📁 test/              # Test files
-├── 📁 uploads/               # User uploaded files
-└── 📄 README.md              # This file
+├──  src/                    # Backend source code
+│   ├──  services/           # Microservices
+│   │   ├──  auth/          # Authentication service
+│   │   ├──  content/       # Content management
+│   │   ├──  social/        # Social interactions
+│   │   ├──  profile/       # User profiles
+│   │   ├──  blog/          # Blog functionality
+│   │   ├──  notification/  # Notifications
+│   │   ├──  search/        # Search functionality
+│   │   └──  moderation/    # Content moderation
+│   ├──  middleware/         # Express middleware
+│   ├──  config/            # Configuration files
+│   ├──  utils/             # Utility functions
+│   └──  test/              # Test files
+├──  uploads/               # User uploaded files
+└──  README.md              # This file
 ```
 
-## 🔌 API Endpoints
+## API Endpoints
 
 ### Authentication
 - `POST /api/v1/auth/register` - User registration
@@ -255,7 +296,7 @@ social-platform/
 - `PUT /api/v1/profile/users/:id` - Update user profile
 - `GET /api/v1/profile/search/users` - Search users
 
-## 🧪 Testing
+## Testing
 
 ### Test Users
 The application comes with pre-configured test users:
@@ -277,7 +318,7 @@ cd frontend
 npm test
 ```
 
-## 🚀 Deployment
+## Deployment
 
 ### Docker Deployment
 ```bash
@@ -299,7 +340,7 @@ npm run build
 npm start
 ```
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -307,17 +348,17 @@ npm start
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Inspired by Instagram's clean and professional design
 - Built with modern web technologies and best practices
 - Thanks to the open-source community for the amazing tools and libraries
 
-## 📞 Support
+## Support
 
 If you have any questions or need help, please:
 - Open an issue on GitHub
@@ -326,6 +367,6 @@ If you have any questions or need help, please:
 
 ---
 
-**Developed with ❤️ by Shaishav** �
+**Developed with  by Shaishav** �
 
-*Social Platform - Where conversations take flight* 🐦
+*Social Platform - Where conversations take flight* 
