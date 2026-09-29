@@ -116,17 +116,17 @@ const Profile: React.FC = () => {
     try {
       if (isFollowing) {
         // Unfollow
-        await api.delete(`/social/users/${id}/follow`);
+        await api.delete(`/social/users/${targetId}/follow`);
         setIsFollowing(false);
         setIsRequested(false);
         setFollowerCount(prev => Math.max(0, prev - 1));
       } else if (isRequested) {
         // Cancel follow request
-        await api.delete(`/social/users/${id}/follow-request`);
+        await api.delete(`/social/users/${targetId}/follow-request`);
         setIsRequested(false);
       } else {
         // Send follow request or follow directly
-        const response = await api.post(`/social/users/${id}/follow`);
+        const response = await api.post(`/social/users/${targetId}/follow`);
         const result = response.data.data;
         
         setIsFollowing(result.following || false);
