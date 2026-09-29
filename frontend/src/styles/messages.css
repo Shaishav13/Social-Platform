@@ -1,0 +1,349 @@
+.wren-messages-layout {
+  display: flex;
+  height: calc(100vh - 80px);
+  width: 100%;
+  background-color: var(--paper-200);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: calc(var(--space-unit) * 2);
+}
+
+.wren-messages-sidebar {
+  width: 320px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--paper-100);
+}
+
+.wren-messages-header {
+  padding: calc(var(--space-unit) * 2);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.25rem;
+  color: var(--ink-900);
+}
+
+.wren-messages-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background-color: var(--paper-100);
+}
+
+.wren-messages-tab {
+  flex: 1;
+  padding: calc(var(--space-unit) * 1.5);
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink-600);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.wren-messages-tab:hover {
+  background-color: var(--paper-200);
+}
+
+.wren-messages-tab.active {
+  color: var(--wine-700);
+  border-bottom-color: var(--wine-700);
+}
+
+.wren-conversation-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.wren-conversation-item {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-unit) * 1.5);
+  padding: calc(var(--space-unit) * 2);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background-color var(--transition-fast);
+}
+
+.wren-conversation-item:hover {
+  background-color: var(--paper-200);
+}
+
+.wren-conversation-item.active {
+  background-color: var(--wine-100);
+}
+[data-theme="dark"] .wren-conversation-item.active {
+  background-color: var(--wine-100); /* Adjusted for dark mode in actual wren.css, but this ensures it works */
+}
+
+.wren-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-round);
+  background-color: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--ink-900);
+  font-weight: 600;
+}
+
+.wren-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wren-conversation-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.wren-conversation-name {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--ink-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.wren-conversation-date {
+  font-size: 0.75rem;
+  color: var(--ink-300);
+  font-weight: normal;
+}
+
+.wren-conversation-last-message {
+  font-family: var(--font-sans);
+  color: var(--ink-600);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.wren-chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--paper-100);
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.wren-chat-header {
+  padding: calc(var(--space-unit) * 2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-unit) * 1.5);
+  background-color: var(--paper-100);
+  flex-shrink: 0;
+}
+
+.wren-chat-header-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.wren-chat-typing {
+  font-size: 0.8rem;
+  color: var(--ochre-600);
+}
+
+.wren-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: calc(var(--space-unit) * 3);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 2);
+}
+
+.wren-message-wrapper {
+  display: flex;
+  width: 100%;
+}
+
+.wren-message-wrapper.mine {
+  justify-content: flex-end;
+}
+
+.wren-message-wrapper.theirs {
+  justify-content: flex-start;
+}
+
+.wren-message-bubble {
+  max-width: 70%;
+  padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.wren-message-wrapper.mine .wren-message-bubble {
+  background-color: var(--wine-700);
+  color: #fff;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 var(--radius-sm);
+}
+
+.wren-message-wrapper.theirs .wren-message-bubble {
+  background-color: var(--paper-200);
+  color: var(--ink-900);
+  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-sm) 0;
+  border: 1px solid var(--border);
+}
+
+.wren-message-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+}
+
+.wren-message-wrapper.mine .wren-message-meta {
+  justify-content: flex-end;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.wren-message-wrapper.theirs .wren-message-meta {
+  justify-content: flex-start;
+  color: var(--ink-600);
+}
+
+.wren-chat-input-area {
+  padding: calc(var(--space-unit) * 2);
+  border-top: 1px solid var(--border);
+  background-color: var(--paper-200);
+  flex-shrink: 0;
+}
+
+.wren-chat-form {
+  display: flex;
+  gap: calc(var(--space-unit) * 2);
+  align-items: center;
+}
+
+.wren-chat-input {
+  flex: 1;
+  background-color: var(--paper-100);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  padding: calc(var(--space-unit) * 1.5);
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+  font-size: 1rem;
+}
+
+.wren-chat-input:focus {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+.wren-chat-send-btn {
+  background-color: var(--wine-700);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-button);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.wren-chat-send-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.wren-chat-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wren-chat-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-600);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.1rem;
+}
+
+.wren-chat-back-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .wren-messages-layout {
+    position: fixed;
+    top: 52px; /* Below top nav */
+    bottom: 56px; /* Above bottom nav */
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    border: none;
+    border-radius: 0;
+    height: auto;
+    margin: 0;
+    z-index: 100;
+  }
+
+  .wren-messages-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    height: 100%;
+  }
+
+  .wren-chat-area {
+    width: 100%;
+    height: 100%;
+  }
+
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  .wren-chat-back-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--ink-900);
+    cursor: pointer;
+    padding: 0 8px 0 0;
+  }
+
+  .wren-chat-header {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .wren-chat-header .wren-avatar {
+    width: 32px;
+    height: 32px;
+  }
+
+  .wren-chat-header .wren-conversation-name {
+    font-size: 1rem !important;
+  }
+}

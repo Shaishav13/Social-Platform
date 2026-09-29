@@ -30,6 +30,7 @@ import Notifications from './pages/Notifications';
 import FollowRequests from './pages/FollowRequests';
 import Search from './pages/Search';
 import Explore from './pages/Explore';
+import Messages from './pages/Messages';
 import Settings from './pages/Settings';
 import AdminRoute from './routes/AdminRoute';
 import {
@@ -83,6 +84,11 @@ function App() {
             <Route path="/profile/:id" element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/messages" element={
+              <ProtectedRoute>
+                <Messages />
               </ProtectedRoute>
             } />
             <Route path="/profile/edit" element={

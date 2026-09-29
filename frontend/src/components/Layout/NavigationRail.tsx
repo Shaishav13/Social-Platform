@@ -40,6 +40,7 @@ export const NavigationRail: React.FC = () => {
     ? [
         { path: '/feed', label: 'Feed', icon: 'home' as const },
         { path: '/explore', label: 'Explore', icon: 'search' as const },
+        { path: '/messages', label: 'Messages', icon: 'message' as const },
         { path: '/create-post', label: 'Compose', icon: 'compose' as const },
         {
           path: '/notifications',
@@ -51,11 +52,6 @@ export const NavigationRail: React.FC = () => {
           path: user?.id ? `/profile/${user.id}` : '/login',
           label: 'Profile',
           icon: 'profile' as const,
-        },
-        {
-          path: '/settings',
-          label: 'Settings',
-          icon: 'settings' as const,
         },
         ...(user?.role === 'admin'
           ? [
@@ -282,7 +278,7 @@ export const NavigationRail: React.FC = () => {
 
       {/* Mobile Bottom Navigation Bar (<720px) */}
       <nav className="wren-mobile-bottom" role="navigation" aria-label="Mobile Navigation">
-        {navItems.map(item => {
+        {navItems.filter(item => item.path !== '/notifications').map(item => {
           const isActive = location.pathname === item.path;
           return (
             <NavLink

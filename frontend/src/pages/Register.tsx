@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useConfig } from '../contexts/ConfigContext';
 import { Button, Icon } from '../components/ui';
 import api from '../services/api';
+import { GoogleLogin } from '@react-oauth/google';
 
 type Step = 'username' | 'credentials' | 'verify' | 'age' | 'profile';
 
@@ -30,16 +31,28 @@ const Register: React.FC = () => {
   const [is18Plus, setIs18Plus] = useState(false);
   const [show18PlusOption, setShow18PlusOption] = useState(false);
   
-  const { register, verifyEmail, updateUser, user, isAuthenticated } = useAuth();
+  const { register, verifyEmail, updateUser, user, isAuthenticated, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // If user is already authenticated and they are on the initial steps,
-    // redirect them to feed. (This prevents logged-in users from seeing the register form).
     if (isAuthenticated && ['username', 'credentials', 'verify'].includes(step)) {
       navigate('/feed');
     }
   }, [isAuthenticated, step, navigate]);
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    try {
+      setIsLoading(true);
+      if (credentialResponse.credential) {
+        await loginWithGoogle(credentialResponse.credential);
+        navigate('/feed', { replace: true });
+      }
+    } catch (err: any) {
+      setErrors({ general: 'Google authentication failed. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleNextStep = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -267,6 +280,31 @@ const Register: React.FC = () => {
       <Button type="submit" variant="primary" isLoading={isUsernameChecking}>
         Continue
       </Button>
+
+      {errors.general && (
+        <div style={{ marginTop: '16px', color: 'var(--rust-alert)', textAlign: 'center', fontSize: '14px' }}>
+          {errors.general}
+        </div>
+      )}
+
+      <div style={{ marginTop: '24px', display: 'flex', alignItems: 'center' }}>
+        <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }}></div>
+        <span style={{ padding: '0 10px', color: 'var(--ink-500)', fontSize: '12px' }}>OR</span>
+        <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }}></div>
+      </div>
+
+      <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+        <GoogleLogin
+          onSuccess={handleGoogleSuccess}
+          onError={() => {
+            setErrors({ general: 'Google authentication failed. Please try again.' });
+          }}
+          theme="outline"
+          size="large"
+          shape="rectangular"
+          text="signup_with"
+        />
+      </div>
     </form>
   );
 

@@ -31,6 +31,7 @@ export type IconName =
   | 'plus'
   | 'filter'
   | 'lock'
+  | 'message'
   | 'unlock';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
@@ -69,6 +70,23 @@ export const Icon: React.FC<IconProps> = ({
         return (
           <path
             d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zm6-1.5L21 21"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        );
+
+      case 'message':
+        return isFilled ? (
+          <path
+            d="M3 10.5C3 6.358 6.582 3 11 3s8 3.358 8 7.5-3.582 7.5-8 7.5c-1.393 0-2.695-.333-3.83-1.025L3 19l1.173-3.95A7.17 7.17 0 013 10.5z"
+            fill="currentColor"
+          />
+        ) : (
+          <path
+            d="M3 10.5C3 6.358 6.582 3 11 3s8 3.358 8 7.5-3.582 7.5-8 7.5c-1.393 0-2.695-.333-3.83-1.025L3 19l1.173-3.95A7.17 7.17 0 013 10.5z"
             fill="none"
             stroke="currentColor"
             strokeWidth={strokeWidth}

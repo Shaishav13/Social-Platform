@@ -8,12 +8,16 @@ import { AuthDatabase } from './database';
 import { DatabaseConnection } from '../../config/database';
 import { EmailService } from './emailService';
 import { createRateLimiter } from '../../middleware/security';
+import { OAuth2Client } from 'google-auth-library';
+import bcrypt from 'bcrypt';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || 'placeholder');
 
 const router = Router();
 
 // Dedicated rate limiters for auth endpoints
 const registerLimiter = createRateLimiter(15 * 60 * 1000, 15, 'Too many registration requests from this IP. Please try again later.');
-const loginLimiter = createRateLimiter(15 * 60 * 1000, 30, 'Too many login attempts from this IP. Please try again later.');
+// We will use a custom dynamic rate limiter for login
 const verifyOtpLimiter = createRateLimiter(15 * 60 * 1000, 30, 'Too many verification attempts from this IP. Please try again later.');
 const resendOtpLimiter = createRateLimiter(15 * 60 * 1000, 10, 'Too many OTP resend requests from this IP. Please try again later.');
 
@@ -568,8 +572,24 @@ router.post('/resend-verification-otp', resendOtpLimiter, async (req: Request, r
   }
 });
 
+const loginFailures = new Map<string, { count: number, blockedUntil: number }>();
+
+const dynamicLoginRateLimiter = (req: Request, res: Response, next: import('express').NextFunction) => {
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+  const state = loginFailures.get(ip);
+  if (state && state.blockedUntil > Date.now()) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many requests from this IP. Please try again later.',
+      retryAfter: Math.ceil((state.blockedUntil - Date.now()) / 1000)
+    });
+  }
+  next();
+};
+
 // POST /auth/login
-router.post('/login', loginLimiter, async (req: Request, res: Response) => {
+router.post('/login', dynamicLoginRateLimiter, async (req: Request, res: Response) => {
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
   try {
     // Validate request body
     const { error, value } = loginSchema.validate(req.body);
@@ -591,11 +611,31 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
     const user = await UserModel.authenticateUser(loginData.email, loginData.password);
     
     if (!user) {
+      const state = loginFailures.get(ip) || { count: 0, blockedUntil: 0 };
+      state.count++;
+      
+      let penalty = 0;
+      if (state.count >= 9) {
+        penalty = 2 * 60 * 1000;
+      } else if (state.count >= 6) {
+        penalty = 60 * 1000;
+      } else if (state.count >= 3) {
+        penalty = 30 * 1000;
+      }
+
+      if (penalty > 0) {
+        state.blockedUntil = Date.now() + penalty;
+      }
+      loginFailures.set(ip, state);
+
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
       });
     }
+
+    // Successful login clears the failures
+    loginFailures.delete(ip);
 
     // Check if email has been verified
     if (user.isVerified === false) {
@@ -637,6 +677,81 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
       success: false,
       message: 'Internal server error',
     });
+  }
+});
+
+// POST /auth/google
+router.post('/google', async (req: Request, res: Response) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Google credential missing' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID || 'placeholder',
+    });
+    
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      return res.status(400).json({ success: false, message: 'Invalid Google token' });
+    }
+
+    const email = payload.email.toLowerCase();
+    let user = await AuthDatabase.findUserByEmail(email);
+
+    if (!user) {
+      // User doesn't exist, create a new one
+      const baseName = payload.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '');
+      let username = baseName;
+      let suffix = 1;
+      while (await AuthDatabase.findUserByUsername(username)) {
+        username = `${baseName}${suffix}`;
+        suffix++;
+      }
+      
+      const randomPassword = crypto.randomBytes(16).toString('hex') + 'A1!';
+      const passwordHash = await bcrypt.hash(randomPassword, 12);
+      
+      await AuthDatabase.createUser({
+        username,
+        email,
+        passwordHash,
+        isVerified: true,
+        emailVerifiedAt: new Date(),
+        role: 'user',
+        isRestricted: false,
+        isPrivate: false,
+        is18Plus: true, // or prompt them later, but setting true so they aren't blocked immediately
+      } as any);
+      
+      user = await AuthDatabase.findUserByEmail(email);
+      if (!user) throw new Error("Failed to create user");
+    }
+
+    // Ensure verified if logging in via Google
+    if (!user.isVerified) {
+       await AuthDatabase.markUserVerified(user.id);
+       user.isVerified = true;
+    }
+
+    const tokens = await UserModel.generateTokens(user);
+
+    const { passwordHash, ...userResponse } = user;
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: userResponse,
+        tokens,
+      },
+    });
+
+  } catch (error: any) {
+    console.error('Google Auth error:', error);
+    res.status(500).json({ success: false, message: 'Google Authentication failed' });
   }
 });
 

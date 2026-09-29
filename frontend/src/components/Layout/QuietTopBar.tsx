@@ -1,12 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useConfig } from '../../contexts/ConfigContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Icon } from '../ui';
+import api from '../../services/api';
 
 export const QuietTopBar: React.FC = () => {
-  const { theme, toggleTheme, toggleDensity } = useTheme();
+  const { theme, toggleTheme } = useTheme();
   const { settings } = useConfig();
+  const { isAuthenticated } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadUnreadCount();
+      const interval = setInterval(loadUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
+  const loadUnreadCount = async () => {
+    try {
+      const response = await api.get('/notifications/unread-count');
+      setUnreadCount(response.data.unreadCount || 0);
+    } catch {
+      // quiet fallback
+    }
+  };
 
   return (
     <header className="wren-mobile-top" role="banner">
@@ -37,13 +58,28 @@ export const QuietTopBar: React.FC = () => {
         >
           <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={18} />
         </button>
-        <button
-          onClick={toggleDensity}
-          style={{ background: 'none', border: 'none', color: 'var(--ink-600)', padding: '6px' }}
-          aria-label="Toggle Spacing Density"
-        >
-          <Icon name="density" size={18} />
-        </button>
+        {isAuthenticated && (
+          <Link
+            to="/notifications"
+            style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-600)', padding: '6px' }}
+            aria-label="Notifications"
+          >
+            <Icon name="notification" size={18} />
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '6px',
+                  right: '6px',
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--ochre-600)',
+                }}
+              />
+            )}
+          </Link>
+        )}
       </div>
     </header>
   );

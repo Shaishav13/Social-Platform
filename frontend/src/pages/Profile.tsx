@@ -25,6 +25,7 @@ const Profile: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isMessageLoading, setIsMessageLoading] = useState(false);
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null);
@@ -144,6 +145,21 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleMessageClick = async () => {
+    if (isMessageLoading) return;
+    setIsMessageLoading(true);
+    try {
+      const targetId = profileUser?.id || id;
+      const response = await api.post('/chat/conversations', { targetUserId: targetId });
+      // Redirect to Messages with conversation ID in URL state or query
+      navigate(`/messages?convId=${response.data.id}`);
+    } catch (error) {
+      console.error('Failed to create/fetch conversation:', error);
+      alert('Failed to start conversation. Please try again later.');
+    } finally {
+      setIsMessageLoading(false);
+    }
+  };
 
   const handlePostUpdate = (updatedPost: Post) => {
     setPosts(prev => 
@@ -214,6 +230,7 @@ const Profile: React.FC = () => {
         user={profileUser}
         isOwnProfile={isOwnProfile}
         onFollowToggle={handleFollowToggle}
+        onMessageClick={handleMessageClick}
         postCount={postCount}
         followersCount={followerCount}
         followingCount={followingCount}

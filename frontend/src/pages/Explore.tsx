@@ -67,18 +67,14 @@ const Explore: React.FC = () => {
       
       // For suggested users, we'll get recent users from the feed posts
       try {
-        // Extract unique authors from all posts and get their profile info
-        const authorIds = [...new Set(allPosts.map((post: Post) => post.authorId))];
-        const userPromises = authorIds.slice(0, 10).map(async (authorId) => {
-          try {
-            const userResponse = await api.get(`/profile/users/${authorId}`);
-            return userResponse.data.user;
-          } catch {
-            return null;
+        const uniqueUsers = new Map();
+        allPosts.forEach((post: Post) => {
+          if (post.author && !uniqueUsers.has(post.author.id)) {
+            uniqueUsers.set(post.author.id, post.author);
           }
         });
         
-        const users = (await Promise.all(userPromises)).filter(user => user !== null);
+        const users = Array.from(uniqueUsers.values()).slice(0, 10);
         setSuggestedUsers(users);
       } catch {
         console.log('No suggested users available');

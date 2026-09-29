@@ -247,6 +247,33 @@ CREATE INDEX IF NOT EXISTS idx_posts_content_search ON posts USING gin(to_tsvect
 CREATE INDEX IF NOT EXISTS idx_blogs_content_search ON blogs USING gin(to_tsvector('english', title || ' ' || content));
 
 -- Create triggers for updating timestamps
+-- Conversations Table
+CREATE TABLE IF NOT EXISTS conversations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    is_group BOOLEAN DEFAULT FALSE,
+    name VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Conversation Participants
+CREATE TABLE IF NOT EXISTS conversation_participants (
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (conversation_id, user_id)
+);
+
+-- Messages Table
+CREATE TABLE IF NOT EXISTS messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    sender_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    read_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN

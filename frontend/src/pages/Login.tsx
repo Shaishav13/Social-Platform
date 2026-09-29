@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui';
 import type { LoginCredentials } from '../types';
+import { GoogleLogin } from '@react-oauth/google';
 
 const Login: React.FC = () => {
   const [credentials, setCredentials] = useState<LoginCredentials>({
@@ -15,11 +16,25 @@ const Login: React.FC = () => {
   const [requiresVerification, setRequiresVerification] = useState(false);
   const [unverifiedEmail, setUnverifiedEmail] = useState('');
 
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = location.state?.from?.pathname || '/feed';
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    try {
+      setIsLoading(true);
+      if (credentialResponse.credential) {
+        await loginWithGoogle(credentialResponse.credential);
+        navigate(from, { replace: true });
+      }
+    } catch (err: any) {
+      setError('Google login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,6 +189,24 @@ const Login: React.FC = () => {
             </Button>
           </div>
         </form>
+
+        <div style={{ marginTop: '24px', display: 'flex', alignItems: 'center' }}>
+          <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }}></div>
+          <span style={{ padding: '0 10px', color: 'var(--ink-500)', fontSize: '12px' }}>OR</span>
+          <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border)' }}></div>
+        </div>
+
+        <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'center' }}>
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => {
+              setError('Google login failed. Please try again.');
+            }}
+            theme="outline"
+            size="large"
+            shape="rectangular"
+          />
+        </div>
 
         <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
           <p className="type-ui-m">

@@ -10,6 +10,7 @@ interface ProfileHeaderProps {
   isOwnProfile?: boolean;
 
   onFollowToggle?: () => void;
+  onMessageClick?: () => void;
   postCount?: number;
   followersCount?: number;
   followingCount?: number;
@@ -23,6 +24,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
   isOwnProfile = false,
 
   onFollowToggle,
+  onMessageClick,
   postCount = 0,
   followersCount = 0,
   followingCount = 0,
@@ -93,19 +95,30 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               </Link>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={features.followRequests || isFollowing ? onFollowToggle : undefined}
-              onMouseEnter={() => setFollowHovered(true)}
-              onMouseLeave={() => setFollowHovered(false)}
-              disabled={!features.followRequests && !isFollowing}
-              className={`wren-btn-follow ${isFollowing ? 'is-following' : ''}`}
-              style={!features.followRequests && !isFollowing ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
-              title={!features.followRequests && !isFollowing ? 'Author subscriptions are temporarily paused by administration' : undefined}
-              aria-label={isFollowing ? 'Unfollow user' : 'Follow user'}
-            >
-              {isFollowing ? (followHovered ? 'Unfollow' : 'Following') : 'Follow'}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={features.followRequests || isFollowing ? onFollowToggle : undefined}
+                onMouseEnter={() => setFollowHovered(true)}
+                onMouseLeave={() => setFollowHovered(false)}
+                disabled={!features.followRequests && !isFollowing}
+                className={`wren-btn-follow ${isFollowing ? 'is-following' : ''}`}
+                style={!features.followRequests && !isFollowing ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+                title={!features.followRequests && !isFollowing ? 'Author subscriptions are temporarily paused by administration' : undefined}
+                aria-label={isFollowing ? 'Unfollow user' : 'Follow user'}
+              >
+                {isFollowing ? (followHovered ? 'Unfollow' : 'Following') : 'Follow'}
+              </button>
+              
+              <button
+                type="button"
+                onClick={onMessageClick}
+                className="wren-btn wren-btn-secondary"
+                style={{ minHeight: '36px', padding: '6px 14px', fontSize: '13.5px' }}
+              >
+                Message
+              </button>
+            </div>
           )}
         </div>
       </div>

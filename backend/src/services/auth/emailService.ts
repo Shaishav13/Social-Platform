@@ -353,6 +353,70 @@ If you did not sign up for UdtaBirdie, please ignore this email.
    * Send password recovery email
    */
   /**
+   * Send new chat message notification
+   */
+  static async sendChatMessageEmail(email: string): Promise<boolean> {
+    const subject = 'You received a new message';
+    const textContent = 'You have received a new message on UdtaBirdie. Log in to check your messages.';
+    const htmlContent = `
+      <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; color: #333;">
+        <h2>You've got a new message!</h2>
+        <p>Someone sent you a new message on UdtaBirdie.</p>
+        <p><a href="${process.env.FRONTEND_URL}/messages" style="display:inline-block; padding: 10px 20px; background-color: #d1b894; color: white; text-decoration: none; border-radius: 4px;">View Messages</a></p>
+      </div>
+    `;
+
+    // 1. PRIMARY REST API: Brevo (port 443, works on cloud hosting)
+    if (await this.sendViaBrevoRest(email, subject, htmlContent, textContent)) {
+      return true;
+    }
+
+    // 2. SECONDARY REST API: Resend (port 443, works on cloud hosting)
+    if (await this.sendViaResend(email, subject, htmlContent, textContent)) {
+      return true;
+    }
+
+    this.initTransporters();
+
+    // 3. TERTIARY SMTP: Brevo SMTP relay
+    if (this.brevoTransporter) {
+      try {
+        const info = await this.brevoTransporter.sendMail({
+          from: this.getBrevoSender(),
+          to: email,
+          subject,
+          text: textContent,
+          html: htmlContent
+        });
+        console.log(`[EMAIL] Chat message email sent to ${email} (Brevo SMTP ID: ${info.messageId})`);
+        return true;
+      } catch (err) {
+        console.error('[EMAIL] Brevo SMTP failed:', err);
+      }
+    }
+
+    // 4. QUATERNARY SMTP: Gmail fallback
+    if (this.gmailTransporter) {
+      try {
+        const info = await this.gmailTransporter.sendMail({
+          from: this.getGmailSender(),
+          to: email,
+          subject,
+          text: textContent,
+          html: htmlContent
+        });
+        console.log(`[EMAIL] Chat message email sent to ${email} (Gmail SMTP ID: ${info.messageId})`);
+        return true;
+      } catch (err) {
+        console.error('[EMAIL] Gmail SMTP failed:', err);
+      }
+    }
+
+    console.warn(`[EMAIL-MOCK] Chat message email for ${email} could not be sent (no transports available)`);
+    return false;
+  }
+
+  /**
    * Send password recovery email
    */
   static async sendPasswordResetEmail(email: string, resetUrl: string, token?: string): Promise<boolean> {

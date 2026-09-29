@@ -8,6 +8,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   register: (data: RegisterData) => Promise<RegisterResult>;
   verifyEmail: (credentials: VerifyEmailCredentials) => Promise<void>;
   resendVerificationOtp: (email: string) => Promise<string>;
@@ -94,6 +95,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const loginWithGoogle = async (credential: string) => {
+    try {
+      const response = await api.post('/auth/google', { credential });
+      const { user: userData, tokens } = response.data.data;
+
+      safeStorage.setItem('authToken', tokens.accessToken);
+      safeStorage.setItem('refreshToken', tokens.refreshToken);
+      setUser(userData);
+    } catch (error) {
+      console.error('Google login error:', error);
+      throw error;
+    }
+  };
+
   const register = async (data: RegisterData): Promise<RegisterResult> => {
     try {
       // Remove confirmPassword before sending to backend
@@ -173,6 +188,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     isAuthenticated,
     login,
+    loginWithGoogle,
     register,
     verifyEmail,
     resendVerificationOtp,

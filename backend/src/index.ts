@@ -47,6 +47,9 @@ import searchRoutes from './services/search/routes';
 import authRoutes from './services/auth/routes';
 import adminRoutes from './services/admin/routes';
 import { createModerationRoutes } from './services/moderation/routes';
+import { chatRoutes } from './services/chat/routes';
+import { ChatDatabase } from './services/chat/database';
+import { chatWebSocketService } from './services/chat/websocket';
 import { InMemoryServiceRegistry, LoadBalancer, CircuitBreaker } from './gateway/serviceDiscovery';
 import { MonitoringService } from './gateway/monitoring';
 import { DatabaseOptimizer, QueryMonitor, ConnectionPoolMonitor } from './utils/performance';
@@ -449,6 +452,9 @@ app.use(`${API_PREFIX}/notifications`, notificationRoutes);
 // Search service routes
 app.use(`${API_PREFIX}/search`, searchRoutes);
 
+// Chat service routes
+app.use(`${API_PREFIX}/chat`, chatRoutes);
+
 // Admin service routes (restricted to role=admin)
 app.use(`${API_PREFIX}/admin`, adminRoutes);
 
@@ -499,6 +505,9 @@ async function startServer(): Promise<void> {
     await AdminDatabase.initializeTables();
     console.log('✅ Admin platform tables initialized');
 
+    await ChatDatabase.initializeTables();
+    console.log('✅ Chat tables initialized');
+
     // Initialize performance monitoring after all tables are created
     DatabaseOptimizer.initialize();
 
@@ -521,6 +530,9 @@ async function startServer(): Promise<void> {
     
     // Set up moderation routes
     app.use(`${API_PREFIX}/moderation`, moderationRoutes);
+    
+    // Set up chat routes
+    app.use(`${API_PREFIX}/chat`, chatRoutes);
 
     // Initialize Redis connection (optional)
     try {
@@ -545,7 +557,8 @@ async function startServer(): Promise<void> {
       { name: 'blog', path: '/blog' },
       { name: 'notifications', path: '/notifications' },
       { name: 'search', path: '/search' },
-      { name: 'moderation', path: '/moderation' }
+      { name: 'moderation', path: '/moderation' },
+      { name: 'chat', path: '/chat' }
     ];
 
     services.forEach(service => {
@@ -582,7 +595,23 @@ async function startServer(): Promise<void> {
     console.log(`🏥 Health checks at: http://localhost:${PORT}/health`);
 
     // Initialize WebSocket server for real-time notifications
-    notificationWebSocketService.initialize(server);
+    notificationWebSocketService.initialize();
+    
+    // Initialize WebSocket server for chat
+    chatWebSocketService.initialize();
+
+    // Handle upgrades manually for multiple WS servers
+    server.on('upgrade', (request, socket, head) => {
+      const pathname = request.url ? request.url.split('?')[0] : '';
+
+      if (pathname === '/notifications/live') {
+        notificationWebSocketService.handleUpgrade(request, socket, head);
+      } else if (pathname === '/ws/chat') {
+        chatWebSocketService.handleUpgrade(request, socket, head);
+      } else {
+        socket.destroy();
+      }
+    });
 
     // Start monitoring and cleanup tasks
     startBackgroundTasks();

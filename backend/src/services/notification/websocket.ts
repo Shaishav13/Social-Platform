@@ -13,10 +13,9 @@ export class NotificationWebSocketService {
   private clients: Map<string, Set<AuthenticatedWebSocket>> = new Map();
   private heartbeatInterval: NodeJS.Timeout | null = null;
 
-  initialize(server: Server): void {
+  initialize(): void {
     this.wss = new WebSocketServer({ 
-      server,
-      path: '/notifications/live'
+      noServer: true 
     });
 
     this.wss.on('connection', (ws: AuthenticatedWebSocket, request) => {
@@ -29,6 +28,13 @@ export class NotificationWebSocketService {
     }, 30000); // 30 seconds
 
     console.log('✅ WebSocket server initialized for notifications');
+  }
+
+  handleUpgrade(request: any, socket: any, head: any): void {
+    if (!this.wss) return;
+    this.wss.handleUpgrade(request, socket, head, (ws) => {
+      this.wss!.emit('connection', ws, request);
+    });
   }
 
   private handleConnection(ws: AuthenticatedWebSocket, request: any): void {
