@@ -63,7 +63,7 @@ const Messages: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [searchParams] = useSearchParams();
   const initialConvId = searchParams.get('convId');
 
