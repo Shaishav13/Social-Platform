@@ -1,26 +1,36 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import '../styles/landing.css';
 
 const Home: React.FC = () => {
   const { isAuthenticated } = useAuth();
 
+  const decorativeElements = (
+    <>
+      <div className="floating-element" style={{ width: 120, height: 160, top: '10%', left: '-5%', animationDuration: '20s' }}></div>
+      <div className="floating-element" style={{ width: 80, height: 80, bottom: '20%', right: '5%', animationDuration: '15s', animationDelay: '2s' }}></div>
+      <div className="floating-element" style={{ width: 150, height: 100, top: '40%', right: '-8%', animationDuration: '25s', animationDelay: '1s' }}></div>
+    </>
+  );
+
   if (isAuthenticated) {
     return (
-      <div style={{ padding: '40px 0' }}>
-        <div style={{ marginBottom: '32px' }}>
-          <h1 className="type-display-l" style={{ marginBottom: '12px' }}>
-            Welcome to UdtaBirdie
+      <div className="landing-container">
+        {decorativeElements}
+        <div className="landing-content">
+          <h1 className="landing-title">
+            Welcome Back to UdtaBirdie
           </h1>
-          <p className="type-body-serif" style={{ color: 'var(--ink-600)', marginBottom: '24px' }}>
+          <p className="landing-subtitle">
             A social platform for people who write, not just post. Treat every thought like correspondence.
           </p>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <Link to="/feed" className="wren-btn wren-btn-primary">
+          <div className="landing-buttons">
+            <Link to="/feed" className="landing-btn landing-btn-primary">
               Open Feed
             </Link>
-            <Link to="/create-post" className="wren-btn wren-btn-secondary">
+            <Link to="/create-post" className="landing-btn landing-btn-secondary">
               Write a Letter
             </Link>
           </div>
@@ -30,51 +40,46 @@ const Home: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '40px 0' }}>
-      <div style={{ marginBottom: '40px' }}>
-        <h1 className="type-display-l" style={{ marginBottom: '14px' }}>
+    <div className="landing-container">
+      {decorativeElements}
+      <div className="landing-content">
+        <h1 className="landing-title">
           UdtaBirdie
         </h1>
-        <p className="type-body-serif" style={{ color: 'var(--ink-600)', marginBottom: '28px' }}>
+        <p className="landing-subtitle">
           A platform for people who write, not just post. Letters, thoughts, and conversations treated like print on paper.
         </p>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <Link to="/register" className="wren-btn wren-btn-primary">
+        <div className="landing-buttons">
+          <Link to="/register" className="landing-btn landing-btn-primary">
             Join the Correspondence
           </Link>
-          <Link to="/login" className="wren-btn wren-btn-secondary">
+          <Link to="/login" className="landing-btn landing-btn-secondary">
             Sign In
           </Link>
         </div>
       </div>
 
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: '32px' }}>
-        <div className="type-display-m" style={{ marginBottom: '20px', fontSize: '20px' }}>
-          Guiding Principles
+      <div className="features-grid">
+        <div className="feature-card">
+          <h2 className="feature-title">Written with Intent</h2>
+          <p className="feature-desc">
+            No endless feeds of noise. Thoughtful prose, essays, and notes read at a measured pace.
+          </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ paddingBottom: '16px', borderBottom: '1px dashed var(--border)' }}>
-            <h2 className="type-ui-l" style={{ marginBottom: '4px' }}>Written with Intent</h2>
-            <p className="type-ui-m">
-              No endless feeds of noise. Thoughtful prose, essays, and notes read at a measured pace.
-            </p>
-          </div>
+        <div className="feature-card">
+          <h2 className="feature-title">Ink & Vellum Aesthetic</h2>
+          <p className="feature-desc">
+            Texture and hierarchy derived from typography, whitespace, and physical press states.
+          </p>
+        </div>
 
-          <div style={{ paddingBottom: '16px', borderBottom: '1px dashed var(--border)' }}>
-            <h2 className="type-ui-l" style={{ marginBottom: '4px' }}>Ink & Vellum Aesthetic</h2>
-            <p className="type-ui-m">
-              Texture and hierarchy derived from typography, whitespace, and physical press states.
-            </p>
-          </div>
-
-          <div>
-            <h2 className="type-ui-l" style={{ marginBottom: '4px' }}>Meaningful Dialogue</h2>
-            <p className="type-ui-m">
-              Replies treated as margin notes and letters in a shared thread.
-            </p>
-          </div>
+        <div className="feature-card">
+          <h2 className="feature-title">Meaningful Dialogue</h2>
+          <p className="feature-desc">
+            Replies treated as margin notes and letters in a shared thread.
+          </p>
         </div>
       </div>
     </div>
